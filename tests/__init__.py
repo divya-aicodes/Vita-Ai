@@ -1,0 +1,2 @@
+"""Vita AI automated tests."""
+

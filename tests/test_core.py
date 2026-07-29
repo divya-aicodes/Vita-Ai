@@ -1,0 +1,123 @@
+from __future__ import annotations
+
+import tempfile
+import unittest
+from io import BytesIO
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
+
+from src.config import CLASS_NAMES, ModelMetadata
+from src.database import PredictionDatabase
+from src.disease_info import get_disease_info, parse_class_label
+from src.prediction import confidence_message, predict_image
+from src.preprocessing import ImageValidationError, load_image, prepare_image
+from src.quality_checker import assess_image_quality
+
+
+def image_bytes(image: Image.Image, fmt: str = "PNG") -> bytes:
+    buffer = BytesIO()
+    image.save(buffer, format=fmt)
+    return buffer.getvalue()
+
+
+class FakeModel:
+    def __init__(self, probabilities):
+        self.probabilities = np.asarray([probabilities], dtype=np.float32)
+
+    def predict(self, batch, verbose=0):
+        if batch.shape != (1, 224, 224, 3):
+            raise AssertionError(f"Unexpected batch shape: {batch.shape}")
+        return self.probabilities
+
+
+class ImageTests(unittest.TestCase):
+    def test_load_image_converts_to_rgb(self):
+        rgba = Image.new("RGBA", (300, 250), (70, 150, 50, 128))
+        loaded = load_image(image_bytes(rgba))
+        self.assertEqual(loaded.mode, "RGB")
+        self.assertEqual(loaded.size, (300, 250))
+
+    def test_invalid_upload_rejected(self):
+        with self.assertRaises(ImageValidationError):
+            load_image(b"not an image")
+
+    def test_preprocessing_shape_and_dtype(self):
+        batch = prepare_image(Image.new("RGB", (320, 260), "green"))
+        self.assertEqual(batch.shape, (1, 224, 224, 3))
+        self.assertEqual(batch.dtype, np.float32)
+
+    def test_quality_checker_detects_flat_image(self):
+        result = assess_image_quality(Image.new("RGB", (400, 400), (2, 2, 2)))
+        self.assertFalse(result.acceptable)
+        self.assertGreater(len(result.warnings), 0)
+
+    def test_quality_checker_accepts_detailed_image(self):
+        y, x = np.indices((400, 400))
+        array = np.zeros((400, 400, 3), dtype=np.uint8)
+        array[..., 0] = (x * 7 + y * 3) % 255
+        array[..., 1] = (x * 3 + y * 11) % 255
+        array[..., 2] = (x * 13 + y * 5) % 255
+        result = assess_image_quality(Image.fromarray(array))
+        self.assertTrue(result.acceptable)
+        self.assertGreater(result.score, 50)
+
+
+class KnowledgeTests(unittest.TestCase):
+    def test_readable_label(self):
+        crop, condition, status = parse_class_label("Tomato___Early_blight")
+        self.assertEqual((crop, condition, status), ("Tomato", "Early Blight", "Diseased"))
+
+    def test_healthy_guidance(self):
+        info = get_disease_info("Potato___Healthy")
+        self.assertEqual(info.status, "Healthy")
+        self.assertIn("screening", info.expert_warning)
+
+
+class PredictionTests(unittest.TestCase):
+    def test_ranking_and_confidence(self):
+        probabilities = np.zeros(len(CLASS_NAMES), dtype=np.float32)
+        probabilities[29] = 0.91
+        probabilities[30] = 0.06
+        probabilities[28] = 0.03
+        result = predict_image(
+            FakeModel(probabilities),
+            Image.new("RGB", (300, 300), "green"),
+            CLASS_NAMES,
+            ModelMetadata(),
+        )
+        self.assertEqual(result.primary.condition, "Early Blight")
+        self.assertEqual(result.confidence_level, "High")
+        self.assertEqual(len(result.alternatives), 2)
+
+    def test_confidence_boundaries(self):
+        self.assertEqual(confidence_message(0.80)[0], "High")
+        self.assertEqual(confidence_message(0.55)[0], "Moderate")
+        self.assertEqual(confidence_message(0.54)[0], "Low")
+
+
+class DatabaseTests(unittest.TestCase):
+    def test_save_feedback_and_analytics(self):
+        with tempfile.TemporaryDirectory() as folder:
+            database = PredictionDatabase(Path(folder) / "test.db")
+            prediction_id = database.save_prediction(
+                crop_name="Tomato",
+                disease_name="Early Blight",
+                health_status="Diseased",
+                confidence=0.91,
+                alternatives=["Tomato — Late Blight", "Tomato — Target Spot"],
+                image_quality_score=88,
+                inference_time_ms=42,
+                model_version="test-model",
+            )
+            self.assertTrue(database.update_feedback(prediction_id, "Correct"))
+            rows = database.recent_predictions()
+            self.assertEqual(rows[0]["feedback"], "Correct")
+            self.assertEqual(database.analytics()["summary"]["total"], 1)
+            self.assertEqual(database.clear_history(), 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
