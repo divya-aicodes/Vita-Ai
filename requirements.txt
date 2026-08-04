@@ -1,4 +1,4 @@
-streamlit>=1.45,<2
+streamlit>=1.60.0,<2
 tensorflow>=2.18,<2.22
 numpy>=1.26,<3
 pillow>=10.4,<13
