@@ -13,7 +13,7 @@ It is a decision-support demonstration—not a confirmed agricultural diagnosis.
 - Blur, brightness, contrast, dimensions, and visible-content checks
 - MobileNetV2 transfer-learning training pipeline
 - Optional custom CNN academic baseline
-- 38 PlantVillage crop/condition classes
+- 70-entry disease library: 38 AI-supported PlantVillage classes plus 32 clearly marked reference-only conditions
 - High, moderate, and low-confidence response rules
 - Top-three predictions
 - Grad-CAM explanation for models trained by this repository
@@ -136,6 +136,19 @@ This writes:
 - `results/confusion_matrix.png`
 
 The app reads those artifacts on the **Model performance** page.
+
+## Disease library scope
+
+The professional knowledge library deliberately separates model capability from educational coverage:
+
+- **AI-supported** entries map exactly to the installed CNN's 38 output classes.
+- **Reference-only** entries broaden crop-health education but are never presented as CNN predictions.
+- Search covers crops, conditions, categories, descriptions, and visible symptoms.
+- Crop, disease-category, and model-coverage filters make the 70 entries easier to browse.
+- Guidance follows conservative integrated pest-management principles and excludes pesticide products and dosages.
+
+Adding a reference entry does not change the CNN. New prediction classes require labeled training data,
+retraining, evaluation, and a matching update to `models/class_names.json`.
 
 ## Run automated tests
 
