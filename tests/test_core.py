@@ -10,7 +10,7 @@ from PIL import Image
 
 from src.config import CLASS_NAMES, ModelMetadata
 from src.database import PredictionDatabase
-from src.disease_info import get_disease_info, parse_class_label
+from src.disease_info import get_disease_info, library_conditions, parse_class_label, reference_conditions
 from src.prediction import confidence_message, predict_image
 from src.preprocessing import ImageValidationError, load_image, prepare_image
 from src.quality_checker import assess_image_quality
@@ -74,6 +74,22 @@ class KnowledgeTests(unittest.TestCase):
         self.assertEqual(info.status, "Healthy")
         self.assertIn("screening", info.expert_warning)
 
+    def test_professional_library_scope(self):
+        items = library_conditions(CLASS_NAMES)
+        self.assertEqual(len(items), 70)
+        self.assertEqual(sum(item.model_supported for item in items), 38)
+        self.assertEqual(sum(not item.model_supported for item in items), 32)
+        self.assertEqual(
+            len({(item.crop.casefold(), item.condition.casefold()) for item in items}),
+            len(items),
+        )
+
+    def test_reference_entries_are_not_prediction_classes(self):
+        items = reference_conditions()
+        self.assertTrue(items)
+        self.assertTrue(all(not item.model_supported for item in items))
+        self.assertIn("Citrus Canker", {item.condition for item in items})
+
 
 class PredictionTests(unittest.TestCase):
     def test_ranking_and_confidence(self):
@@ -120,4 +136,3 @@ class DatabaseTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

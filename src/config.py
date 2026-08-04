@@ -15,7 +15,7 @@ ASSETS_DIR = PROJECT_ROOT / "assets"
 
 APP_TITLE = "ᕓ𐌉𐌕𐌀 𐌀𐌉"
 APP_SUBTITLE = "An Explainable CNN-Based Plant Disease Screening and Advisory System"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 MODEL_VERSION = "mobilenetv2-plantvillage-1.0"
 
 MODEL_PATH = MODELS_DIR / "plant_disease_mobilenetv2.keras"
@@ -113,4 +113,3 @@ def load_model_metadata(path: Path = METADATA_PATH) -> ModelMetadata:
     raw: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     allowed = ModelMetadata.__dataclass_fields__.keys()
     return ModelMetadata(**{key: value for key, value in raw.items() if key in allowed})
-

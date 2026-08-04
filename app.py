@@ -23,7 +23,7 @@ from src.config import (
     load_model_metadata,
 )
 from src.database import PredictionDatabase
-from src.disease_info import supported_conditions
+from src.disease_info import library_conditions
 from src.model import ModelUnavailableError, load_trained_model
 from src.prediction import predict_image
 from src.preprocessing import ImageValidationError, load_image
@@ -128,6 +128,19 @@ def inject_styles() -> None:
         }
         .model-ready { color: #d5e76b; font-weight: 700; }
         .model-missing { color: #ffd591; font-weight: 700; }
+        .vita-badge {
+            display: inline-block;
+            border-radius: 999px;
+            padding: .22rem .58rem;
+            margin: 0 .35rem .65rem 0;
+            font-size: .72rem;
+            font-weight: 800;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+        .vita-badge-ai { background: #dfeadd; color: #173f35; }
+        .vita-badge-reference { background: #eef0e8; color: #59635d; }
+        .vita-badge-category { background: #f4f0d8; color: #655d27; }
         [data-testid="stMetric"] {
             background: rgba(255,255,255,.72);
             border: 1px solid var(--line);
@@ -521,28 +534,97 @@ def render_performance() -> None:
 
 
 def render_library() -> None:
-    hero(
-        "Supported knowledge",
-        "Disease library",
-        "Browse the crop and condition classes understood by the default 38-class PlantVillage model.",
-    )
     labels = load_class_names()
-    items = supported_conditions(labels)
+    items = library_conditions(labels)
+    ai_supported = [item for item in items if item.model_supported]
+    reference_only = [item for item in items if not item.model_supported]
+    hero(
+        "Curated plant-health knowledge",
+        "Disease library",
+        f"Explore {len(items)} crop and condition references. AI-supported entries match the installed "
+        "CNN; reference-only entries broaden education without overstating model capability.",
+    )
+
+    metrics = st.columns(4)
+    metrics[0].metric("Entries", len(items))
+    metrics[1].metric("AI classes", len(ai_supported))
+    metrics[2].metric("References", len(reference_only))
+    metrics[3].metric("Crops", len({item.crop for item in items}))
+    st.info(
+        "AI-supported means the installed model has a matching output class. Reference-only entries are "
+        "educational and cannot be selected as CNN predictions."
+    )
+
     crops = sorted({item.crop for item in items})
-    selected = st.selectbox("Filter by crop", ("All crops", *crops))
-    search = st.text_input("Search conditions", placeholder="e.g. early blight")
+    categories = sorted({item.category for item in items})
+    search_col, crop_col, category_col = st.columns((1.5, 1, 1))
+    with search_col:
+        search = st.text_input("Search library", placeholder="Crop, condition, symptom, or category")
+    with crop_col:
+        selected_crop = st.selectbox("Crop", ("All crops", *crops))
+    with category_col:
+        selected_category = st.selectbox("Category", ("All categories", *categories))
+    support_filter = st.radio(
+        "Model coverage",
+        ("All entries", "AI-supported only", "Reference-only"),
+        horizontal=True,
+    )
+
+    query = search.casefold().strip()
     filtered = [
         item
         for item in items
-        if (selected == "All crops" or item.crop == selected)
-        and (not search or search.casefold() in f"{item.crop} {item.condition}".casefold())
+        if (selected_crop == "All crops" or item.crop == selected_crop)
+        and (selected_category == "All categories" or item.category == selected_category)
+        and (support_filter != "AI-supported only" or item.model_supported)
+        and (support_filter != "Reference-only" or not item.model_supported)
+        and (
+            not query
+            or query
+            in " ".join(
+                (item.crop, item.condition, item.category, item.description, item.symptoms)
+            ).casefold()
+        )
     ]
-    st.caption(f"{len(filtered)} supported class(es)")
+    st.caption(f"Showing {len(filtered)} of {len(items)} library entries")
+    if not filtered:
+        st.warning("No entries match these filters. Clear the search or broaden the filters.")
+        return
+
     for item in filtered:
-        with st.expander(f"{item.crop} · {item.condition}"):
+        coverage = "AI-supported" if item.model_supported else "Reference-only"
+        prefix = "●" if item.model_supported else "○"
+        with st.expander(f"{prefix} {item.crop} · {item.condition}"):
+            coverage_class = "vita-badge-ai" if item.model_supported else "vita-badge-reference"
+            st.markdown(
+                f'<span class="vita-badge {coverage_class}">{coverage}</span>'
+                f'<span class="vita-badge vita-badge-category">{item.category}</span>',
+                unsafe_allow_html=True,
+            )
             st.write(item.description)
-            st.markdown(f"**Common symptoms:** {item.symptoms}")
-            st.markdown(f"**General prevention:** {item.prevention}")
+            st.markdown(f"**Common visible symptoms**  \n{item.symptoms}")
+            st.markdown(f"**Conservative prevention guidance**  \n{item.prevention}")
+            if not item.model_supported:
+                st.caption(
+                    "Knowledge-base entry only — the current CNN cannot predict this condition. "
+                    "Use local diagnostic services for confirmation."
+                )
+
+    st.divider()
+    with st.expander("Library standards and authoritative references"):
+        st.markdown(
+            "Guidance follows integrated pest-management principles: prevention, clean planting material, "
+            "sanitation, resistant varieties, monitoring, and confirmation by qualified local professionals. "
+            "Recommendations deliberately exclude pesticide products and dosages."
+        )
+        st.markdown(
+            "- [FAO integrated pest-management principles]"
+            "(https://www.fao.org/pest-and-pesticide-management/ipm/principles-and-practices/en/)\n"
+            "- [American Phytopathological Society: plant disease diagnosis]"
+            "(https://www.apsnet.org/edcenter/Pages/PlantDiseaseDiagnosis.aspx)\n"
+            "- [USDA APHIS citrus disease guidance]"
+            "(https://www.aphis.usda.gov/plant-pests-diseases/citrus-diseases)"
+        )
 
 
 def render_about() -> None:
