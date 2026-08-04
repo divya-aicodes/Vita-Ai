@@ -165,6 +165,10 @@ def database() -> PredictionDatabase:
 
 @st.cache_resource(show_spinner="Loading the CNN model…")
 def model_bundle():
+    if not MODEL_PATH.exists():
+        from download_model import install_model
+
+        install_model()
     labels = load_class_names()
     metadata = load_model_metadata()
     model = load_trained_model()
@@ -177,8 +181,6 @@ def model_bundle():
 
 
 def model_status() -> tuple[bool, str]:
-    if not MODEL_PATH.exists():
-        return False, "Model not installed"
     try:
         model_bundle()
         return True, "CNN ready"

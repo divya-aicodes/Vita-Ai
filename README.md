@@ -56,6 +56,10 @@ python -m venv .venv
 
 Streamlit prints the local URL, usually <http://localhost:8501>.
 
+On Streamlit Community Cloud, the app automatically downloads the public MIT-licensed
+model from Hugging Face on first launch. The model file is intentionally excluded from
+Git because it is a generated runtime dependency.
+
 ## Accuracy and responsible use
 
 No image classifier is “perfectly accurate.” Accuracy depends on:
