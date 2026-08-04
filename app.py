@@ -148,6 +148,10 @@ def inject_styles() -> None:
             border-radius: 18px;
             background: rgba(255,255,255,.65);
         }
+        button[aria-label*="fullscreen" i],
+        button[title*="fullscreen" i] {
+            display: none !important;
+        }
         @media (max-width: 700px) {
             .vita-hero { padding: 1.5rem; border-radius: 18px; }
             .vita-hero h1 { font-size: 2.6rem; }
