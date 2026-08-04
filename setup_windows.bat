@@ -5,11 +5,11 @@ set "WINDIR=C:\Windows"
 set "MPLCONFIGDIR=%~dp0.matplotlib"
 where py >nul 2>nul
 if %errorlevel%==0 (
-  set "PYTHON_CMD=py -3.11"
+  set "PYTHON_CMD=py -3.12"
 ) else (
   where python >nul 2>nul
   if errorlevel 1 (
-    echo Python 3.10 or 3.11 was not found on PATH.
+    echo Python 3.12 was not found on PATH.
     echo Install Python from https://www.python.org/downloads/ and enable "Add Python to PATH".
     pause
     exit /b 1

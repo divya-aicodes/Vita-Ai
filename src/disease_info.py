@@ -503,4 +503,6 @@ def library_conditions(labels: list[str]) -> list[DiseaseInfo]:
 
     combined = [*supported_conditions(labels), *reference_conditions()]
     unique = {(item.crop.casefold(), item.condition.casefold()): item for item in combined}
-    return sorted(unique.values(), key=lambda item: (item.crop.casefold(), item.condition.casefold()))
+    return sorted(
+        unique.values(), key=lambda item: (item.crop.casefold(), item.condition.casefold())
+    )

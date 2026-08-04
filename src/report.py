@@ -9,10 +9,13 @@ from .quality_checker import QualityResult
 
 
 def build_text_report(result: PredictionResult, quality: QualityResult, model_version: str) -> str:
-    alternatives = "\n".join(
-        f"  - {item.crop} — {item.condition}: {item.confidence:.1%}"
-        for item in result.alternatives
-    ) or "  - None"
+    alternatives = (
+        "\n".join(
+            f"  - {item.crop} — {item.condition}: {item.confidence:.1%}"
+            for item in result.alternatives
+        )
+        or "  - None"
+    )
     info = result.disease_info
     return f"""ᕓ𐌉𐌕𐌀 𐌀𐌉 — Plant Screening Report
 Generated: {datetime.now(UTC).isoformat(timespec="seconds")}

@@ -2,6 +2,22 @@
 
 All notable Vita AI changes are documented here.
 
+## 1.2.0 — 2026-08-04
+
+### Added
+
+- Added automated lint, compilation, and unit-test checks through GitHub Actions.
+- Added Dependabot, structured issue forms, a pull-request checklist, contribution guidance, and a private security-reporting policy.
+- Added SHA-256 and file-size verification for the downloadable model artifact.
+- Added tests for model-artifact hashing and failed-database-transaction rollback.
+
+### Changed
+
+- Hardened SQLite with write-ahead logging, busy timeouts, explicit rollback, and foreign-key enforcement.
+- Replaced unexpected internal exception details with safe user-facing messages and server-side logging.
+- Standardized Python 3.12 setup, line endings, and Ruff quality rules.
+- Bumped the application version to 1.2.0.
+
 ## 1.1.0 — 2026-08-04
 
 ### Added

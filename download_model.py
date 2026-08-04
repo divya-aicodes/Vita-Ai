@@ -3,14 +3,23 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 from pathlib import Path
 
-from src.config import CLASS_NAMES, LABELS_PATH, METADATA_PATH, MODEL_PATH, ensure_runtime_directories
+from src.config import (
+    CLASS_NAMES,
+    LABELS_PATH,
+    METADATA_PATH,
+    MODEL_PATH,
+    ensure_runtime_directories,
+)
 
 REPO_ID = "rarfileexe/Plant-Disease-Detector"
 FILENAME = "model_4_mobilenet_finetuned.keras"
+EXPECTED_SIZE_BYTES = 25_143_175
+EXPECTED_SHA256 = "08f285aff6d9e1ab88d4d5b2269f1cc977714003755f8553887edbf8691b325f"
 
 
 def parse_args() -> argparse.Namespace:
@@ -28,7 +37,33 @@ def _metadata() -> dict[str, object]:
         "preprocessing": "embedded",
         "last_conv_layer": "out_relu",
         "source": f"https://huggingface.co/{REPO_ID}",
+        "source_filename": FILENAME,
+        "source_sha256": EXPECTED_SHA256,
+        "license": "MIT",
     }
+
+
+def sha256_file(path: Path) -> str:
+    """Return a streaming SHA-256 digest without loading a model into memory."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_model_file(path: Path) -> None:
+    """Reject incomplete or unexpected third-party model artifacts."""
+    if path.stat().st_size != EXPECTED_SIZE_BYTES:
+        raise RuntimeError(
+            f"Model size verification failed: expected {EXPECTED_SIZE_BYTES:,} bytes, "
+            f"received {path.stat().st_size:,} bytes."
+        )
+    actual_sha256 = sha256_file(path)
+    if actual_sha256 != EXPECTED_SHA256:
+        raise RuntimeError(
+            "Model checksum verification failed. The download may be corrupted or changed upstream."
+        )
 
 
 def install_model(force: bool = False) -> Path:
@@ -46,9 +81,14 @@ def install_model(force: bool = False) -> Path:
         ) from exc
 
     downloaded = Path(hf_hub_download(repo_id=REPO_ID, filename=FILENAME))
+    verify_model_file(downloaded)
     temporary_path = MODEL_PATH.with_suffix(f"{MODEL_PATH.suffix}.part")
-    shutil.copy2(downloaded, temporary_path)
-    temporary_path.replace(MODEL_PATH)
+    try:
+        shutil.copy2(downloaded, temporary_path)
+        verify_model_file(temporary_path)
+        temporary_path.replace(MODEL_PATH)
+    finally:
+        temporary_path.unlink(missing_ok=True)
     LABELS_PATH.write_text(json.dumps(CLASS_NAMES, indent=2), encoding="utf-8")
     METADATA_PATH.write_text(json.dumps(_metadata(), indent=2), encoding="utf-8")
     return MODEL_PATH
@@ -64,7 +104,9 @@ def main() -> None:
 
     print(f"Installed model at {path}")
     print("Source: https://huggingface.co/rarfileexe/Plant-Disease-Detector")
-    print("License: MIT. Accuracy claims are third-party/self-reported; evaluate locally before relying on them.")
+    print(
+        "License: MIT. Accuracy claims are third-party/self-reported; evaluate locally before relying on them."
+    )
 
 
 if __name__ == "__main__":

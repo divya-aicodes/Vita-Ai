@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest a focused improvement to Vita AI.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: User need
+      description: What problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the expected user experience and acceptance criteria.
+    validations:
+      required: true

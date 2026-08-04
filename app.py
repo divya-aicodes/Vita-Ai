@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import streamlit as st
@@ -17,7 +18,6 @@ from src.config import (
     HISTORY_PATH,
     METRICS_PATH,
     MODEL_PATH,
-    MODEL_VERSION,
     ensure_runtime_directories,
     load_class_names,
     load_model_metadata,
@@ -33,6 +33,7 @@ from src.report import build_text_report
 APP_ROOT = Path(__file__).resolve().parent
 LOGO_PATH = APP_ROOT / "assets" / "vita-ai-logo.png"
 ICON_PATH = APP_ROOT / "assets" / "vita-ai-icon.png"
+LOGGER = logging.getLogger(__name__)
 
 st.set_page_config(
     page_title=f"{APP_TITLE} · Plant Health Screening",
@@ -201,8 +202,11 @@ def model_status() -> tuple[bool, str]:
     try:
         model_bundle()
         return True, "CNN ready"
-    except Exception as exc:
+    except ModelUnavailableError as exc:
         return False, f"Model needs attention: {exc}"
+    except Exception:
+        LOGGER.exception("Unexpected model initialization failure")
+        return False, "Model needs attention. Check the server logs for details."
 
 
 def hero(kicker: str, heading: str, body: str) -> None:
@@ -268,7 +272,7 @@ def render_home() -> None:
         ("Sharp focus", "Hold steady and focus on spots or discoloration."),
         ("Simple background", "Reduce clutter behind the leaf when possible."),
     )
-    for column, (title, text) in zip(cols, tips):
+    for column, (title, text) in zip(cols, tips, strict=True):
         with column:
             st.markdown(f"**{title}**  \n{text}")
     st.markdown(
@@ -306,7 +310,9 @@ def persist_prediction(result, quality, metadata) -> int:
     )
 
 
-def render_prediction_result(result, quality, prediction_id: int, model, labels, metadata, image) -> None:
+def render_prediction_result(
+    result, quality, prediction_id: int, model, labels, metadata, image
+) -> None:
     primary = result.primary
     status_icon = "✓" if primary.status == "Healthy" else "!"
     st.markdown(
@@ -335,11 +341,15 @@ def render_prediction_result(result, quality, prediction_id: int, model, labels,
         if primary.confidence >= 0.55:
             st.markdown(f"**General prevention**  \n{info.prevention}")
         else:
-            st.warning("Prevention guidance is hidden because confidence is low. Try another image first.")
+            st.warning(
+                "Prevention guidance is hidden because confidence is low. Try another image first."
+            )
         st.warning(info.expert_warning)
     with tab_explain:
         if primary.confidence < 0.55:
-            st.info("Explainability is withheld for this low-confidence result; capture another image.")
+            st.info(
+                "Explainability is withheld for this low-confidence result; capture another image."
+            )
         else:
             try:
                 from src.gradcam import explain_prediction
@@ -356,8 +366,9 @@ def render_prediction_result(result, quality, prediction_id: int, model, labels,
                 st.caption(
                     "Grad-CAM is an explanation of model attention, not a segmentation of infected tissue."
                 )
-            except Exception as exc:
-                st.info(f"Grad-CAM is unavailable for this model build: {exc}")
+            except Exception:
+                LOGGER.exception("Grad-CAM generation failed")
+                st.info("Grad-CAM is unavailable for this model build.")
     with tab_alternatives:
         rows = [
             {
@@ -380,8 +391,12 @@ def render_prediction_result(result, quality, prediction_id: int, model, labels,
     )
     st.markdown("#### Was this screening useful?")
     feedback_cols = st.columns(3)
-    choices = (("Correct", "Appears correct"), ("Incorrect", "Appears incorrect"), ("Unsure", "I’m unsure"))
-    for column, (value, label) in zip(feedback_cols, choices):
+    choices = (
+        ("Correct", "Appears correct"),
+        ("Incorrect", "Appears incorrect"),
+        ("Unsure", "I’m unsure"),
+    )
+    for column, (value, label) in zip(feedback_cols, choices, strict=True):
         if column.button(label, key=f"feedback-{prediction_id}-{value}", use_container_width=True):
             database().update_feedback(prediction_id, value)
             st.success("Anonymous feedback saved. Thank you.")
@@ -409,7 +424,11 @@ def render_screening() -> None:
         return
     preview, assessment = st.columns((1, 1.1), gap="large")
     with preview:
-        st.image(image, caption=f"Selected image · {image.width} × {image.height}", use_container_width=True)
+        st.image(
+            image,
+            caption=f"Selected image · {image.width} × {image.height}",
+            use_container_width=True,
+        )
     quality = assess_image_quality(image)
     with assessment:
         render_quality(quality)
@@ -429,8 +448,9 @@ def render_screening() -> None:
     except ModelUnavailableError as exc:
         st.error(str(exc))
         st.code("python download_model.py\nstreamlit run app.py", language="bash")
-    except Exception as exc:
-        st.error(f"Analysis stopped safely: {exc}")
+    except Exception:
+        LOGGER.exception("Unexpected screening failure")
+        st.error("Analysis stopped safely. Please try another image or contact the app maintainer.")
 
 
 def render_history() -> None:
@@ -471,7 +491,11 @@ def render_history() -> None:
         "image_quality_score",
         "feedback",
     ]
-    st.dataframe([{key: row[key] for key in visible} for row in rows], hide_index=True, use_container_width=True)
+    st.dataframe(
+        [{key: row[key] for key in visible} for row in rows],
+        hide_index=True,
+        use_container_width=True,
+    )
     with st.expander("Privacy controls"):
         st.warning("Clearing history permanently deletes all locally stored prediction metadata.")
         confirm = st.checkbox("I understand that this cannot be undone.")
@@ -512,7 +536,7 @@ def render_performance() -> None:
         ("Macro recall", "macro_recall"),
         ("Macro F1", "macro_f1"),
     )
-    for column, (label, key) in zip(cols, displayed):
+    for column, (label, key) in zip(cols, displayed, strict=True):
         value = metrics.get(key)
         column.metric(label, "—" if value is None else f"{float(value):.2%}")
     if history:
@@ -527,7 +551,9 @@ def render_performance() -> None:
         import pandas as pd
 
         st.subheader("Per-class report")
-        st.dataframe(pd.read_csv(CLASSIFICATION_REPORT_PATH), hide_index=True, use_container_width=True)
+        st.dataframe(
+            pd.read_csv(CLASSIFICATION_REPORT_PATH), hide_index=True, use_container_width=True
+        )
     st.caption(
         "Dataset metrics may overestimate field reliability because PlantVillage images commonly use controlled backgrounds."
     )
@@ -559,7 +585,9 @@ def render_library() -> None:
     categories = sorted({item.category for item in items})
     search_col, crop_col, category_col = st.columns((1.5, 1, 1))
     with search_col:
-        search = st.text_input("Search library", placeholder="Crop, condition, symptom, or category")
+        search = st.text_input(
+            "Search library", placeholder="Crop, condition, symptom, or category"
+        )
     with crop_col:
         selected_crop = st.selectbox("Crop", ("All crops", *crops))
     with category_col:
@@ -581,9 +609,7 @@ def render_library() -> None:
         and (
             not query
             or query
-            in " ".join(
-                (item.crop, item.condition, item.category, item.description, item.symptoms)
-            ).casefold()
+            in f"{item.crop} {item.condition} {item.category} {item.description} {item.symptoms}".casefold()
         )
     ]
     st.caption(f"Showing {len(filtered)} of {len(items)} library entries")

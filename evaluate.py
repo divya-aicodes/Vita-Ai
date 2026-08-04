@@ -21,7 +21,9 @@ from src.model import load_trained_model
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate the Vita AI CNN.")
-    parser.add_argument("--data", type=Path, required=True, help="Test folder containing one folder per class.")
+    parser.add_argument(
+        "--data", type=Path, required=True, help="Test folder containing one folder per class."
+    )
     parser.add_argument("--model", type=Path, default=MODEL_PATH)
     parser.add_argument("--batch-size", type=int, default=32)
     return parser.parse_args()
@@ -67,11 +69,13 @@ def main() -> None:
         y_true, y_pred, average="macro", zero_division=0
     )
     metrics = {
-        "samples": int(len(y_true)),
+        "samples": len(y_true),
         "classes": len(labels),
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "top_3_accuracy": float(
-            top_k_accuracy_score(y_true, probabilities, k=min(3, len(labels)), labels=range(len(labels)))
+            top_k_accuracy_score(
+                y_true, probabilities, k=min(3, len(labels)), labels=range(len(labels))
+            )
         ),
         "macro_precision": float(precision),
         "macro_recall": float(recall),

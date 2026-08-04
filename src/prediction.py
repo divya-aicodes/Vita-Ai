@@ -103,4 +103,3 @@ def predict_image(
         inference_time_ms=round(elapsed_ms, 1),
         disease_info=get_disease_info(ranked[0].label),
     )
-

@@ -49,13 +49,7 @@ def assess_image_quality(image: Image.Image) -> QualityResult:
 
     # Laplacian-like second derivative; normalized for resolution-independent reporting.
     center = gray[1:-1, 1:-1]
-    laplacian = (
-        -4.0 * center
-        + gray[:-2, 1:-1]
-        + gray[2:, 1:-1]
-        + gray[1:-1, :-2]
-        + gray[1:-1, 2:]
-    )
+    laplacian = -4.0 * center + gray[:-2, 1:-1] + gray[2:, 1:-1] + gray[1:-1, :-2] + gray[1:-1, 2:]
     sharpness = float(np.var(laplacian))
     warnings: list[str] = []
     penalties = 0.0
@@ -70,7 +64,9 @@ def assess_image_quality(image: Image.Image) -> QualityResult:
         warnings.append("The image appears overexposed. Avoid harsh light and glare.")
         penalties += min(30, (brightness - 220) * 0.85)
     if contrast < 18:
-        warnings.append("The image has very low contrast. Use a plain background and even lighting.")
+        warnings.append(
+            "The image has very low contrast. Use a plain background and even lighting."
+        )
         penalties += min(25, (18 - contrast) * 1.2)
     if sharpness < 30:
         warnings.append("The image appears blurry. Hold the camera steady and focus on the leaf.")

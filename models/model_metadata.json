@@ -1,9 +1,12 @@
 {
-  "model_version": "rarfileexe-plantvillage-mobilenetv2",
-  "model_name": "MobileNetV2 fine-tuned on PlantVillage",
+  "model_version": "mobilenetv2-plantvillage-1.0",
+  "model_name": "MobileNetV2",
   "input_width": 224,
   "input_height": 224,
   "preprocessing": "embedded",
   "last_conv_layer": "out_relu",
-  "source": "https://huggingface.co/rarfileexe/Plant-Disease-Detector"
+  "source": "https://huggingface.co/rarfileexe/Plant-Disease-Detector",
+  "source_filename": "model_4_mobilenet_finetuned.keras",
+  "source_sha256": "08f285aff6d9e1ab88d4d5b2269f1cc977714003755f8553887edbf8691b325f",
+  "license": "MIT"
 }

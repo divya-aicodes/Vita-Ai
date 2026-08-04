@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterator
 
 from .config import DATABASE_PATH
 
@@ -51,14 +51,20 @@ class PredictionDatabase:
         connection = sqlite3.connect(self.path, timeout=10)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA busy_timeout = 10000")
         try:
             yield connection
             connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
         finally:
             connection.close()
 
     def initialize(self) -> None:
         with self.connection() as connection:
+            connection.execute("PRAGMA journal_mode = WAL")
+            connection.execute("PRAGMA synchronous = NORMAL")
             connection.executescript(SCHEMA)
 
     def save_prediction(
@@ -73,7 +79,7 @@ class PredictionDatabase:
         inference_time_ms: float,
         model_version: str,
     ) -> int:
-        values = (alternatives + [None, None])[:2]
+        values = [*alternatives, None, None][:2]
         with self.connection() as connection:
             cursor = connection.execute(
                 """
@@ -156,4 +162,3 @@ class PredictionDatabase:
             count = int(connection.execute("SELECT COUNT(*) FROM predictions").fetchone()[0])
             connection.execute("DELETE FROM predictions")
         return count
-

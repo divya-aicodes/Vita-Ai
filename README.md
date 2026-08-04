@@ -6,6 +6,8 @@ Vita AI is a privacy-conscious Streamlit application for educational plant-leaf 
 
 It is a decision-support demonstration—not a confirmed agricultural diagnosis.
 
+[Open the live app](https://vita-ai-plant-health.streamlit.app/) · [Report a bug](https://github.com/divya-aicodes/Vita-Ai/issues/new/choose)
+
 ## Features
 
 - JPG, JPEG, and PNG upload plus camera capture
@@ -36,7 +38,7 @@ run_vita_ai.bat
 
 ### Fresh installation
 
-Install Python 3.10 or 3.11 from <https://www.python.org/downloads/> and enable **Add Python to PATH** during installation. Then double-click:
+Install Python 3.12 from <https://www.python.org/downloads/> and enable **Add Python to PATH** during installation. Then double-click:
 
 ```text
 setup_windows.bat
@@ -58,7 +60,8 @@ Streamlit prints the local URL, usually <http://localhost:8501>.
 
 On Streamlit Community Cloud, the app automatically downloads the public MIT-licensed
 model from Hugging Face on first launch. The model file is intentionally excluded from
-Git because it is a generated runtime dependency.
+Git because it is a generated runtime dependency. The installer verifies its pinned
+file size and SHA-256 checksum before activation, then performs an atomic replacement.
 
 ## Accuracy and responsible use
 
@@ -158,7 +161,17 @@ The core unit tests do not need TensorFlow or Streamlit:
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-The tests cover genuine-image validation, RGB conversion, CNN tensor shape, quality checks, label parsing, confidence boundaries, top-three ranking, SQLite persistence, feedback, analytics, and configuration consistency.
+The tests cover genuine-image validation, RGB conversion, CNN tensor shape, quality checks, label parsing, confidence boundaries, top-three ranking, SQLite persistence and rollback, feedback, analytics, model-artifact hashing, and configuration consistency.
+
+Run all repository quality gates locally:
+
+```powershell
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m compileall -q app.py src tests download_model.py evaluate.py prepare_dataset.py train.py
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+GitHub Actions runs the same gates for every pull request and every push to `main`.
 
 ## Project structure
 
@@ -204,6 +217,10 @@ Vita Ai/
 - Users can clear local history from the app.
 - The app does not expose local file paths to uploaders.
 - It gives no pesticide product or dosage recommendations.
+- The public model artifact is pinned to a verified SHA-256 digest.
+- SQLite uses foreign-key checks, a write-ahead log, busy timeouts, and transaction rollback.
+
+Please report security vulnerabilities privately through [GitHub Security Advisories](https://github.com/divya-aicodes/Vita-Ai/security/advisories/new). See `SECURITY.md` for the disclosure policy and `CONTRIBUTING.md` for development standards.
 
 ## Troubleshooting
 

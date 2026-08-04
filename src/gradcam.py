@@ -19,7 +19,9 @@ def _tf() -> Any:
     return tf
 
 
-def make_gradcam_heatmap(model, batch: np.ndarray, class_index: int, metadata: ModelMetadata) -> np.ndarray:
+def make_gradcam_heatmap(
+    model, batch: np.ndarray, class_index: int, metadata: ModelMetadata
+) -> np.ndarray:
     """Generate a heatmap for the stable model architectures in ``src.model``."""
 
     tf = _tf()
