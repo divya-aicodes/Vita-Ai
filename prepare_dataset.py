@@ -14,7 +14,6 @@ from pathlib import Path, PurePosixPath
 import httpx
 from huggingface_hub import hf_hub_download
 
-
 REPOSITORY = "mohanty/PlantVillage"
 REVISION = "main"
 EXPECTED_CLASSES = 38
@@ -45,14 +44,16 @@ def model_class_name(source_name: str) -> str:
     name = source_name
     name = name.replace("Cherry_(including_sour)___", "Cherry___")
     name = name.replace("Corn_(maize)___", "Corn___")
-    name = name.replace("Cercospora_leaf_spot Gray_leaf_spot", "Cercospora_leaf_spot_Gray_leaf_spot")
+    name = name.replace(
+        "Cercospora_leaf_spot Gray_leaf_spot", "Cercospora_leaf_spot_Gray_leaf_spot"
+    )
     name = name.replace("Common_rust_", "Common_rust")
     name = name.replace(
         "Spider_mites Two-spotted_spider_mite",
         "Spider_mites_Two-spotted_spider_mite",
     )
     if name.endswith("___healthy"):
-        name = f"{name[:-len('healthy')]}Healthy"
+        name = f"{name[: -len('healthy')]}Healthy"
     return name
 
 
@@ -230,7 +231,9 @@ def main() -> None:
         missing_members = wanted - set(members)
         if missing_members:
             sample = sorted(missing_members)[:5]
-            raise SystemExit(f"Archive is missing {len(missing_members)} images; examples: {sample}")
+            raise SystemExit(
+                f"Archive is missing {len(missing_members)} images; examples: {sample}"
+            )
         counts = {
             split: extract_split(archive, members, split_entries, split, args.destination)
             for split, split_entries in entries.items()

@@ -1,0 +1,29 @@
+name: Bug report
+description: Report a reproducible problem in Vita AI.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach private images or personal information.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include the page, action, and visible error.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How can we reproduce it?
+      placeholder: List the smallest reliable sequence of steps.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, operating system, and app version.
+    validations:
+      required: true

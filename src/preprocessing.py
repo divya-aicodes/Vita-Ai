@@ -69,4 +69,3 @@ def prepare_image(
     elif preprocessing != "embedded":
         raise ValueError(f"Unknown preprocessing mode: {preprocessing}")
     return np.expand_dims(array, axis=0)
-

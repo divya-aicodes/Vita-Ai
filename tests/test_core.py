@@ -8,9 +8,15 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from download_model import sha256_file
 from src.config import CLASS_NAMES, ModelMetadata
 from src.database import PredictionDatabase
-from src.disease_info import get_disease_info, library_conditions, parse_class_label, reference_conditions
+from src.disease_info import (
+    get_disease_info,
+    library_conditions,
+    parse_class_label,
+    reference_conditions,
+)
 from src.prediction import confidence_message, predict_image
 from src.preprocessing import ImageValidationError, load_image, prepare_image
 from src.quality_checker import assess_image_quality
@@ -132,6 +138,43 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual(rows[0]["feedback"], "Correct")
             self.assertEqual(database.analytics()["summary"]["total"], 1)
             self.assertEqual(database.clear_history(), 1)
+
+    def test_failed_transaction_is_rolled_back(self):
+        with tempfile.TemporaryDirectory() as folder:
+            database = PredictionDatabase(Path(folder) / "test.db")
+            with self.assertRaises(RuntimeError):
+                with database.connection() as connection:
+                    connection.execute(
+                        """
+                        INSERT INTO predictions (
+                            created_at, crop_name, disease_name, health_status, confidence,
+                            image_quality_score, inference_time_ms, model_version
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            "2026-08-04T00:00:00+00:00",
+                            "Tomato",
+                            "Healthy",
+                            "Healthy",
+                            0.9,
+                            90,
+                            10,
+                            "test",
+                        ),
+                    )
+                    raise RuntimeError("simulate a failed request")
+            self.assertEqual(database.analytics()["summary"]["total"], 0)
+
+
+class ModelInstallerTests(unittest.TestCase):
+    def test_streaming_sha256(self):
+        with tempfile.TemporaryDirectory() as folder:
+            artifact = Path(folder) / "artifact.bin"
+            artifact.write_bytes(b"vita-ai")
+            self.assertEqual(
+                sha256_file(artifact),
+                "a62fb49591cdf7a5b75ac1bc84e1119cf380b996bd1fb570f57028f0e1ba99ab",
+            )
 
 
 if __name__ == "__main__":

@@ -19,7 +19,9 @@ from src.model import build_custom_cnn, build_mobilenetv2, compile_model, runtim
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train the Vita AI plant-disease classifier.")
-    parser.add_argument("--data", type=Path, required=True, help="Dataset root or a folder containing train/valid.")
+    parser.add_argument(
+        "--data", type=Path, required=True, help="Dataset root or a folder containing train/valid."
+    )
     parser.add_argument("--model", choices=("mobilenetv2", "custom-cnn"), default="mobilenetv2")
     parser.add_argument("--epochs", type=int, default=12)
     parser.add_argument("--fine-tune-epochs", type=int, default=5)
@@ -27,7 +29,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--validation-split", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output", type=Path, default=MODEL_PATH)
-    parser.add_argument("--no-imagenet", action="store_true", help="Do not download ImageNet weights.")
+    parser.add_argument(
+        "--no-imagenet", action="store_true", help="Do not download ImageNet weights."
+    )
     return parser.parse_args()
 
 
@@ -146,11 +150,12 @@ def main() -> None:
     metadata = runtime_metadata_for(model)
     METADATA_PATH.write_text(json.dumps(metadata.__dict__, indent=2), encoding="utf-8")
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    HISTORY_PATH.write_text(json.dumps(merge_history(initial, fine_tuned), indent=2), encoding="utf-8")
+    HISTORY_PATH.write_text(
+        json.dumps(merge_history(initial, fine_tuned), indent=2), encoding="utf-8"
+    )
     print(f"Saved model to {args.output}")
     print(f"Saved {len(class_names)} class labels to {LABELS_PATH}")
 
 
 if __name__ == "__main__":
     main()
-
