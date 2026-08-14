@@ -427,10 +427,7 @@ def sidebar() -> str:
     brand_mark = "V"
     if BRAND_ICON_PATH.exists():
         encoded_icon = base64.b64encode(BRAND_ICON_PATH.read_bytes()).decode("ascii")
-        brand_mark = (
-            '<img src="data:image/png;base64,'
-            f'{encoded_icon}" alt="Vita AI logo">'
-        )
+        brand_mark = f'<img src="data:image/png;base64,{encoded_icon}" alt="Vita AI logo">'
 
     st.sidebar.markdown(
         f"""
