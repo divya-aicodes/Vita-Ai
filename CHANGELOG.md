@@ -2,6 +2,14 @@
 
 All notable Vita AI changes are documented here.
 
+## 1.3.2 — 2026-08-14
+
+### Fixed
+
+- Restored a visible, touch-friendly mobile sidebar opener while keeping unrelated Streamlit toolbar actions hidden.
+- Improved the sidebar close button contrast on the dark navigation surface.
+- Bumped the application version to 1.3.2.
+
 ## 1.3.1 — 2026-08-14
 
 ### Changed
