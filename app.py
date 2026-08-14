@@ -467,7 +467,7 @@ def render_home() -> None:
         """,
         unsafe_allow_html=True,
     )
-    action, learn, _spacer = st.columns((1.25, 1.25, 1.5))
+    action, learn = st.columns(2)
     with action:
         st.button(
             "Start a leaf screening",
