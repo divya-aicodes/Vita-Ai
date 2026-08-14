@@ -336,7 +336,32 @@ def inject_styles() -> None:
         .vita-principle span { color: var(--muted); font-size: .9rem; line-height: 1.55; }
         footer { visibility: hidden; }
         #MainMenu { visibility: hidden; }
-        [data-testid="stToolbar"] { display: none !important; }
+        [data-testid="stToolbar"] {
+            display: flex !important;
+            position: absolute !important;
+            inset: .65rem auto auto .65rem !important;
+            z-index: 1001 !important;
+            width: auto !important;
+            height: auto !important;
+        }
+        [data-testid="stToolbar"] [data-testid="stBaseButton-header"],
+        [data-testid="stToolbar"] [data-testid="stMainMenuButton"] {
+            display: none !important;
+        }
+        [data-testid="stExpandSidebarButton"] {
+            display: inline-flex !important;
+            width: 42px !important;
+            height: 42px !important;
+            border: 1px solid rgba(255,255,255,.22) !important;
+            border-radius: 13px !important;
+            color: #fff !important;
+            background: var(--forest-900) !important;
+            box-shadow: 0 8px 24px rgba(8,43,36,.22) !important;
+        }
+        [data-testid="stSidebarCollapseButton"] button {
+            color: #fff !important;
+            background: rgba(255,255,255,.1) !important;
+        }
         [data-testid="stDecoration"] { display: none !important; }
         button[data-testid="stBaseButton-headerNoPadding"] { color: var(--forest-900); }
         @media (prefers-reduced-motion: reduce) {
@@ -357,32 +382,6 @@ def inject_styles() -> None:
             .vita-trust-strip { grid-template-columns: 1fr 1fr; }
             .vita-trust-item { padding: .75rem; }
             .vita-card { padding: 1.15rem; border-radius: 18px; }
-            [data-testid="stToolbar"] {
-                display: flex !important;
-                position: absolute !important;
-                inset: .65rem auto auto .65rem !important;
-                z-index: 1001 !important;
-                width: auto !important;
-                height: auto !important;
-            }
-            [data-testid="stToolbar"] [data-testid="stBaseButton-header"],
-            [data-testid="stToolbar"] [data-testid="stMainMenuButton"] {
-                display: none !important;
-            }
-            [data-testid="stExpandSidebarButton"] {
-                display: inline-flex !important;
-                width: 42px !important;
-                height: 42px !important;
-                border: 1px solid rgba(255,255,255,.22) !important;
-                border-radius: 13px !important;
-                color: #fff !important;
-                background: var(--forest-900) !important;
-                box-shadow: 0 8px 24px rgba(8,43,36,.22) !important;
-            }
-            [data-testid="stSidebarCollapseButton"] button {
-                color: #fff !important;
-                background: rgba(255,255,255,.1) !important;
-            }
         }
         </style>
         """,
