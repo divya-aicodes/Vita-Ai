@@ -2,6 +2,21 @@
 
 All notable Vita AI changes are documented here.
 
+## 1.3.0 — 2026-08-14
+
+### Added
+
+- Added a Krea-generated botanical diagnostic hero illustration tailored to explainable plant-health AI.
+- Added direct home-page actions, a capability trust strip, guided screening steps, improved empty states, and responsible-AI principle cards.
+
+### Changed
+
+- Redesigned the complete Streamlit interface with a premium forest, mineral sage, warm ivory, and chartreuse visual system.
+- Improved navigation hierarchy, typography, spacing, controls, tables, metrics, expanders, mobile responsiveness, focus states, and reduced-motion behavior.
+- Reworked page copy and information hierarchy to emphasize confidence, evidence, privacy, and responsible use.
+- Replaced dependency on the deleted legacy logo assets with a resilient CSS wordmark and monogram.
+- Bumped the application version to 1.3.0.
+
 ## 1.2.0 — 2026-08-04
 
 ### Added

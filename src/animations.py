@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import base64
 from html import escape
+from pathlib import Path
 
 import streamlit as st
 
 
-def render_animated_hero(kicker: str, heading: str, body: str) -> None:
+def render_animated_hero(
+    kicker: str,
+    heading: str,
+    body: str,
+    artwork_path: Path | None = None,
+) -> None:
     """Render ShinyText and BorderGlow behavior without a separate React build.
 
     Streamlit does not expose its React component tree to Python, so the supplied
@@ -19,6 +26,11 @@ def render_animated_hero(kicker: str, heading: str, body: str) -> None:
     safe_kicker = escape(kicker)
     safe_heading = escape(heading)
     safe_body = escape(body)
+    artwork = "none"
+    if artwork_path and artwork_path.exists():
+        mime = "image/png" if artwork_path.suffix.casefold() == ".png" else "image/jpeg"
+        encoded = base64.b64encode(artwork_path.read_bytes()).decode("ascii")
+        artwork = f"url(data:{mime};base64,{encoded})"
     st.html(
         f"""
 <style>
@@ -35,10 +47,11 @@ def render_animated_hero(kicker: str, heading: str, body: str) -> None:
     --cursor-angle: 110deg;
     --edge-sensitivity: 24;
     --color-sensitivity: 44;
-    --border-radius: 24px;
+    --border-radius: 30px;
     --glow-padding: 26px;
     --cone-spread: 24;
-    --card-bg: #173f35;
+    --card-bg: #0d352d;
+    --artwork: {artwork};
     --fill-opacity: .34;
     --glow-color: hsl(72deg 68% 67% / 100%);
     --glow-color-60: hsl(72deg 68% 67% / 60%);
@@ -59,7 +72,7 @@ def render_animated_hero(kicker: str, heading: str, body: str) -> None:
     isolation: isolate;
     transform: translate3d(0, 0, .01px);
     display: grid;
-    margin: 26px;
+    margin: 24px 0;
     border: 1px solid rgb(255 255 255 / 15%);
     border-radius: var(--border-radius);
     background: var(--card-bg);
@@ -67,7 +80,7 @@ def render_animated_hero(kicker: str, heading: str, body: str) -> None:
     box-shadow:
       rgba(23, 63, 53, .07) 0 2px 4px,
       rgba(23, 63, 53, .09) 0 8px 18px,
-      rgba(23, 63, 53, .12) 0 22px 48px;
+      rgba(12, 50, 42, .16) 0 24px 60px;
   }}
 
   .vita-react-bits .border-glow-card::before,
@@ -179,22 +192,27 @@ def render_animated_hero(kicker: str, heading: str, body: str) -> None:
   .vita-react-bits .border-glow-inner {{
     position: relative;
     z-index: 1;
-    min-height: 190px;
-    padding: 31px 34px 29px;
+    min-height: 238px;
+    padding: 42px 44px 38px;
     overflow: hidden;
     border-radius: calc(var(--border-radius) - 1px);
-    background:
-      radial-gradient(circle at 90% 15%, rgb(213 231 107 / 30%), transparent 12rem),
-      linear-gradient(135deg, #173f35 0%, #2f6753 100%);
+    background-image:
+      linear-gradient(90deg, rgb(9 46 38 / 98%) 0%, rgb(9 46 38 / 90%) 46%, rgb(9 46 38 / 42%) 78%, rgb(9 46 38 / 20%) 100%),
+      var(--artwork),
+      radial-gradient(circle at 88% 14%, rgb(207 225 106 / 28%), transparent 15rem),
+      linear-gradient(135deg, #0d352d 0%, #28614f 100%);
+    background-position: center, right center, center, center;
+    background-repeat: no-repeat;
+    background-size: cover, 62% auto, cover, cover;
   }}
 
   .vita-react-bits .kicker {{
     margin: 0 0 8px;
-    color: #d5e76b;
-    font-size: 12px;
+    color: #d8ea79;
+    font-size: 11px;
     line-height: 1.2;
     font-weight: 800;
-    letter-spacing: .16em;
+    letter-spacing: .18em;
     text-transform: uppercase;
   }}
 
@@ -203,7 +221,7 @@ def render_animated_hero(kicker: str, heading: str, body: str) -> None:
     max-width: 100%;
     margin: 0 0 13px;
     color: #e8efe6;
-    font-size: clamp(35px, 6vw, 68px);
+    font-size: clamp(38px, 6vw, 72px);
     line-height: .96;
     font-weight: 800;
     letter-spacing: -.045em;
@@ -217,9 +235,9 @@ def render_animated_hero(kicker: str, heading: str, body: str) -> None:
   }}
 
   .vita-react-bits .description {{
-    max-width: 760px;
+    max-width: 660px;
     margin: 0;
-    color: #e8efe6;
+    color: #edf3eb;
     font-size: clamp(15px, 2vw, 17px);
     line-height: 1.55;
   }}
@@ -231,8 +249,16 @@ def render_animated_hero(kicker: str, heading: str, body: str) -> None:
   }}
 
   @media (max-width: 680px) {{
-    .vita-react-bits .border-glow-card {{ margin: 18px 8px 20px; --glow-padding: 14px; }}
-    .vita-react-bits .border-glow-inner {{ min-height: 184px; padding: 26px 23px; }}
+    .vita-react-bits .border-glow-card {{ margin: 18px 0 20px; --glow-padding: 14px; }}
+    .vita-react-bits .border-glow-inner {{
+      min-height: 220px;
+      padding: 30px 25px;
+      background-image:
+        linear-gradient(90deg, rgb(9 46 38 / 95%) 0%, rgb(9 46 38 / 82%) 100%),
+        var(--artwork),
+        linear-gradient(135deg, #0d352d 0%, #28614f 100%);
+      background-size: cover, cover, cover;
+    }}
     .vita-react-bits .shiny-text {{ font-size: 39px; }}
   }}
 

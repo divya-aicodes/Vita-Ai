@@ -31,15 +31,14 @@ from src.quality_checker import assess_image_quality
 from src.report import build_text_report
 
 APP_ROOT = Path(__file__).resolve().parent
-LOGO_PATH = APP_ROOT / "assets" / "vita-ai-logo.png"
-ICON_PATH = APP_ROOT / "assets" / "vita-ai-icon.png"
+HERO_ARTWORK_PATH = APP_ROOT / "assets" / "vita-ai-diagnostic-hero.jpg"
 LOGGER = logging.getLogger(__name__)
 
 st.set_page_config(
     page_title=f"{APP_TITLE} · Plant Health Screening",
-    page_icon=str(ICON_PATH) if ICON_PATH.exists() else "🌿",
+    page_icon="🌿",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 
@@ -48,86 +47,213 @@ def inject_styles() -> None:
         """
         <style>
         :root {
-            --forest: #173f35;
-            --leaf: #3b735d;
-            --sage: #dfeadd;
-            --lime: #d5e76b;
-            --paper: #f7f8f2;
-            --ink: #17201c;
-            --muted: #65706a;
-            --line: #d9dfd7;
+            --forest-950: #082b24;
+            --forest-900: #0d352d;
+            --forest-800: #16493c;
+            --forest-700: #24614f;
+            --sage-100: #e9f0e7;
+            --sage-50: #f3f7f1;
+            --lime-400: #cfe16c;
+            --lime-300: #dce987;
+            --paper: #fafbf7;
+            --surface: #ffffff;
+            --ink: #14231d;
+            --muted: #617069;
+            --line: #dce5dc;
+            --warning: #8a6418;
+            --radius-lg: 24px;
+            --radius-md: 16px;
+            --shadow-sm: 0 8px 24px rgba(12, 52, 43, .055);
+            --shadow-md: 0 18px 50px rgba(12, 52, 43, .09);
+        }
+        html { scroll-behavior: smooth; }
+        body, .stApp {
+            font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
         }
         .stApp {
             background:
-                radial-gradient(circle at 90% 4%, rgba(213,231,107,.18), transparent 24rem),
-                linear-gradient(180deg, #f9faf5 0%, #f3f6ef 100%);
+                radial-gradient(circle at 88% -4%, rgba(207,225,108,.16), transparent 31rem),
+                radial-gradient(circle at 5% 42%, rgba(110,163,139,.09), transparent 26rem),
+                linear-gradient(180deg, #fbfcf8 0%, #f4f7f2 100%);
             color: var(--ink);
         }
+        [data-testid="stAppViewContainer"] > .main .block-container {
+            max-width: 1240px;
+            padding-top: 1.25rem;
+            padding-bottom: 4rem;
+        }
+        [data-testid="stHeader"] { background: transparent; }
         [data-testid="stSidebar"] {
-            background: #173f35;
+            background:
+                radial-gradient(circle at 18% 5%, rgba(207,225,108,.13), transparent 15rem),
+                linear-gradient(180deg, var(--forest-950), var(--forest-900));
             border-right: 1px solid rgba(255,255,255,.08);
         }
-        [data-testid="stSidebar"] * { color: #f4f6ee; }
+        [data-testid="stSidebar"] > div:first-child { padding-top: 1rem; }
+        [data-testid="stSidebar"] * { color: #f1f5ef; }
         [data-testid="stSidebar"] div[role="radiogroup"] label {
-            border-radius: 12px;
-            padding: .42rem .65rem;
+            border: 1px solid transparent;
+            border-radius: 13px;
+            padding: .48rem .65rem;
+            margin-bottom: .18rem;
+            transition: background-color .16s ease, border-color .16s ease;
+        }
+        [data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+            background: rgba(255,255,255,.06);
+            border-color: rgba(255,255,255,.08);
         }
         [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
-            background: rgba(213,231,107,.16);
+            background: rgba(207,225,108,.14);
+            border-color: rgba(207,225,108,.28);
+            box-shadow: inset 3px 0 0 var(--lime-400);
+        }
+        .vita-brand {
+            display: flex;
+            align-items: center;
+            gap: .78rem;
+            padding: .4rem .1rem 1rem;
+        }
+        .vita-brand-mark {
+            display: grid;
+            place-items: center;
+            width: 46px;
+            height: 46px;
+            border: 1px solid rgba(220,233,135,.55);
+            border-radius: 15px;
+            color: var(--lime-300);
+            background: rgba(255,255,255,.055);
+            font-size: 1.22rem;
+            font-weight: 850;
+            box-shadow: inset 0 0 18px rgba(207,225,108,.08);
+        }
+        .vita-brand-name { color: #fff; font-size: 1.04rem; font-weight: 800; letter-spacing: .02em; }
+        .vita-brand-sub { color: #b9c9c0; font-size: .72rem; line-height: 1.35; }
+        .vita-sidebar-label {
+            margin: .25rem 0 .45rem;
+            color: #91a69c;
+            font-size: .68rem;
+            font-weight: 800;
+            letter-spacing: .14em;
+            text-transform: uppercase;
         }
         .vita-kicker {
-            color: var(--leaf);
+            color: var(--forest-700);
             font-size: .76rem;
             font-weight: 800;
             letter-spacing: .16em;
             text-transform: uppercase;
             margin-bottom: .4rem;
         }
-        .vita-hero {
-            padding: 2.1rem 2.2rem;
-            border-radius: 24px;
-            color: #f9fbf5;
-            background:
-                radial-gradient(circle at 90% 15%, rgba(213,231,107,.32), transparent 12rem),
-                linear-gradient(135deg, #173f35 0%, #2f6753 100%);
-            box-shadow: 0 22px 55px rgba(23,63,53,.14);
-            margin-bottom: 1.2rem;
-        }
-        .vita-hero h1 {
-            color: #fff;
-            font-size: clamp(2rem, 5vw, 4.5rem);
-            line-height: .95;
-            letter-spacing: -.04em;
-            margin: 0 0 .8rem;
-        }
-        .vita-hero p { color: #e8efe6; max-width: 48rem; font-size: 1.08rem; margin: 0; }
         .vita-card {
-            background: rgba(255,255,255,.78);
+            position: relative;
+            overflow: hidden;
+            background: rgba(255,255,255,.9);
             border: 1px solid var(--line);
-            border-radius: 18px;
-            padding: 1.15rem 1.2rem;
+            border-radius: var(--radius-lg);
+            padding: 1.35rem 1.4rem;
             height: 100%;
-            box-shadow: 0 10px 30px rgba(31,60,48,.05);
+            box-shadow: var(--shadow-sm);
         }
-        .vita-card h3 { margin-top: 0; color: var(--forest); }
+        .vita-card::after {
+            content: "";
+            position: absolute;
+            width: 94px;
+            height: 94px;
+            right: -44px;
+            bottom: -48px;
+            border-radius: 50%;
+            background: rgba(207,225,108,.13);
+        }
+        .vita-card h3 { margin: 0 0 .55rem; color: var(--forest-900); font-size: 1rem; }
+        .vita-card p { margin: 0; color: var(--muted); line-height: 1.58; }
+        .vita-step {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            margin-bottom: .9rem;
+            border-radius: 10px;
+            background: var(--sage-100);
+            color: var(--forest-800);
+            font-size: .78rem;
+            font-weight: 850;
+        }
+        .vita-trust-strip {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            margin: .25rem 1.5rem 1.35rem;
+            border: 1px solid var(--line);
+            border-radius: 17px;
+            background: var(--line);
+            box-shadow: var(--shadow-sm);
+        }
+        .vita-trust-item { background: rgba(255,255,255,.94); padding: .85rem 1rem; }
+        .vita-trust-value { display: block; color: var(--forest-900); font-size: 1rem; font-weight: 850; }
+        .vita-trust-label { color: var(--muted); font-size: .72rem; }
+        .vita-section-head { margin: 2rem 0 .85rem; }
+        .vita-section-head small {
+            color: var(--forest-700);
+            font-size: .68rem;
+            font-weight: 850;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+        }
+        .vita-section-head h2 {
+            margin: .22rem 0 .35rem;
+            color: var(--forest-950);
+            font-size: clamp(1.45rem, 3vw, 2.05rem);
+            letter-spacing: -.025em;
+        }
+        .vita-section-head p { max-width: 48rem; margin: 0; color: var(--muted); }
+        .vita-workflow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .8rem;
+            margin: .25rem 0 1.25rem;
+            padding: .85rem 1rem;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
+            background: rgba(255,255,255,.72);
+            color: var(--muted);
+            font-size: .8rem;
+        }
+        .vita-workflow strong { color: var(--forest-800); }
+        .vita-workflow-arrow { color: #9aaba2; }
+        .vita-empty {
+            padding: 2.2rem;
+            border: 1px dashed #b9c9bd;
+            border-radius: var(--radius-lg);
+            background: rgba(255,255,255,.62);
+            text-align: center;
+            color: var(--muted);
+        }
         .vita-result {
-            background: linear-gradient(135deg, #e8f0e4, #f6f8ed);
-            border: 1px solid #cbd9c8;
-            border-left: 6px solid #3b735d;
-            border-radius: 18px;
-            padding: 1.25rem 1.4rem;
+            background:
+                radial-gradient(circle at 92% 20%, rgba(207,225,108,.24), transparent 10rem),
+                linear-gradient(135deg, #e8f1e8, #f9faf4);
+            border: 1px solid #c7d8ca;
+            border-left: 5px solid var(--forest-700);
+            border-radius: var(--radius-lg);
+            padding: 1.4rem 1.55rem;
+            box-shadow: var(--shadow-sm);
         }
-        .vita-result .condition { color: var(--forest); font-size: 1.7rem; font-weight: 800; }
+        .vita-result .condition { color: var(--forest-900); font-size: 1.75rem; font-weight: 850; letter-spacing: -.025em; }
         .vita-result .crop { color: var(--muted); font-size: .9rem; text-transform: uppercase; letter-spacing: .12em; }
         .vita-disclaimer {
-            background: #fff8e7;
-            border: 1px solid #ead8aa;
-            color: #584716;
-            border-radius: 14px;
-            padding: .9rem 1rem;
+            background: #fff9e9;
+            border: 1px solid #ead9aa;
+            border-left: 4px solid #c39430;
+            color: #5d4918;
+            border-radius: var(--radius-md);
+            padding: 1rem 1.05rem;
             font-size: .9rem;
+            line-height: 1.55;
         }
-        .model-ready { color: #d5e76b; font-weight: 700; }
+        .model-ready { color: var(--lime-300); font-weight: 750; }
         .model-missing { color: #ffd591; font-weight: 700; }
         .vita-badge {
             display: inline-block;
@@ -139,36 +265,89 @@ def inject_styles() -> None:
             letter-spacing: .04em;
             text-transform: uppercase;
         }
-        .vita-badge-ai { background: #dfeadd; color: #173f35; }
+        .vita-badge-ai { background: var(--sage-100); color: var(--forest-900); }
         .vita-badge-reference { background: #eef0e8; color: #59635d; }
         .vita-badge-category { background: #f4f0d8; color: #655d27; }
         [data-testid="stMetric"] {
-            background: rgba(255,255,255,.72);
+            background: rgba(255,255,255,.88);
             border: 1px solid var(--line);
-            border-radius: 16px;
-            padding: .85rem 1rem;
+            border-radius: var(--radius-md);
+            padding: .95rem 1.05rem;
+            box-shadow: 0 6px 20px rgba(12,52,43,.035);
         }
+        [data-testid="stMetricValue"] { color: var(--forest-900); font-weight: 820; }
         .stButton > button, .stDownloadButton > button {
             border-radius: 999px;
             font-weight: 750;
-            border-color: #3b735d;
+            min-height: 2.8rem;
+            border-color: var(--forest-700);
+            transition: transform .14s ease, box-shadow .14s ease, background-color .14s ease;
+        }
+        .stButton > button:hover, .stDownloadButton > button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 22px rgba(13,53,45,.12);
         }
         .stButton > button[kind="primary"] {
-            background: #173f35;
+            background: var(--forest-900);
             color: white;
         }
+        .stButton > button:focus-visible, .stDownloadButton > button:focus-visible,
+        input:focus-visible, textarea:focus-visible {
+            outline: 3px solid rgba(207,225,108,.55) !important;
+            outline-offset: 2px;
+        }
         [data-testid="stFileUploaderDropzone"] {
-            border: 1.5px dashed #7a9b8d;
-            border-radius: 18px;
-            background: rgba(255,255,255,.65);
+            min-height: 170px;
+            border: 1.5px dashed #77998a;
+            border-radius: var(--radius-lg);
+            background: rgba(255,255,255,.75);
+        }
+        [data-testid="stExpander"] {
+            overflow: hidden;
+            border-color: var(--line);
+            border-radius: var(--radius-md);
+            background: rgba(255,255,255,.7);
+        }
+        [data-baseweb="tab-list"] { gap: .35rem; }
+        [data-baseweb="tab"] {
+            border-radius: 999px;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        [data-baseweb="tab"][aria-selected="true"] { background: var(--sage-100); }
+        [data-testid="stDataFrame"] { border-radius: var(--radius-md); overflow: hidden; }
+        .vita-principle {
+            min-height: 148px;
+            padding: 1.2rem;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
+            background: rgba(255,255,255,.8);
+        }
+        .vita-principle strong { display: block; margin-bottom: .4rem; color: var(--forest-900); }
+        .vita-principle span { color: var(--muted); font-size: .9rem; line-height: 1.55; }
+        footer { visibility: hidden; }
+        #MainMenu { visibility: hidden; }
+        [data-testid="stToolbar"] { display: none !important; }
+        [data-testid="stDecoration"] { display: none !important; }
+        button[data-testid="stBaseButton-headerNoPadding"] { color: var(--forest-900); }
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+            *, *::before, *::after { transition: none !important; }
         }
         button[aria-label*="fullscreen" i],
         button[title*="fullscreen" i] {
             display: none !important;
         }
+        @media (max-width: 900px) {
+            .vita-trust-strip { grid-template-columns: repeat(2, 1fr); margin-inline: .5rem; }
+            .vita-workflow { align-items: flex-start; flex-direction: column; }
+            .vita-workflow-arrow { display: none; }
+        }
         @media (max-width: 700px) {
-            .vita-hero { padding: 1.5rem; border-radius: 18px; }
-            .vita-hero h1 { font-size: 2.6rem; }
+            [data-testid="stAppViewContainer"] > .main .block-container { padding-inline: 1rem; }
+            .vita-trust-strip { grid-template-columns: 1fr 1fr; }
+            .vita-trust-item { padding: .75rem; }
+            .vita-card { padding: 1.15rem; border-radius: 18px; }
         }
         </style>
         """,
@@ -209,15 +388,46 @@ def model_status() -> tuple[bool, str]:
         return False, "Model needs attention. Check the server logs for details."
 
 
-def hero(kicker: str, heading: str, body: str) -> None:
-    render_animated_hero(kicker, heading, body)
+def hero(kicker: str, heading: str, body: str, *, artwork: bool = False) -> None:
+    render_animated_hero(
+        kicker,
+        heading,
+        body,
+        artwork_path=HERO_ARTWORK_PATH if artwork else None,
+    )
+
+
+def section_heading(eyebrow: str, heading: str, body: str) -> None:
+    st.markdown(
+        f"""
+        <div class="vita-section-head">
+            <small>{eyebrow}</small>
+            <h2>{heading}</h2>
+            <p>{body}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def navigate_to(page: str) -> None:
+    st.session_state["page"] = page
 
 
 def sidebar() -> str:
-    if LOGO_PATH.exists():
-        st.sidebar.image(str(LOGO_PATH), width=104)
-    st.sidebar.markdown(f"## {APP_TITLE}")
-    st.sidebar.caption("Explainable plant-health screening")
+    st.sidebar.markdown(
+        f"""
+        <div class="vita-brand">
+            <div class="vita-brand-mark">V</div>
+            <div>
+                <div class="vita-brand-name">{APP_TITLE}</div>
+                <div class="vita-brand-sub">Explainable plant-health AI</div>
+            </div>
+        </div>
+        <div class="vita-sidebar-label">Workspace</div>
+        """,
+        unsafe_allow_html=True,
+    )
     page = st.sidebar.radio(
         "Navigate",
         (
@@ -228,6 +438,7 @@ def sidebar() -> str:
             "Disease library",
             "About & limitations",
         ),
+        key="page",
         label_visibility="collapsed",
     )
     st.sidebar.divider()
@@ -240,41 +451,80 @@ def sidebar() -> str:
 
 def render_home() -> None:
     hero(
-        "Plant health, explained",
+        "Explainable plant intelligence",
         APP_TITLE,
-        f"{APP_SUBTITLE}. Upload a clear leaf image to receive a confidence-aware educational screening.",
+        f"{APP_SUBTITLE}. Screen a leaf, inspect the model's evidence, and act with appropriate caution.",
+        artwork=True,
+    )
+    st.markdown(
+        """
+        <div class="vita-trust-strip" aria-label="System capabilities">
+            <div class="vita-trust-item"><span class="vita-trust-value">38</span><span class="vita-trust-label">AI-supported classes</span></div>
+            <div class="vita-trust-item"><span class="vita-trust-value">70</span><span class="vita-trust-label">Knowledge references</span></div>
+            <div class="vita-trust-item"><span class="vita-trust-value">Grad-CAM</span><span class="vita-trust-label">Visual explanation</span></div>
+            <div class="vita-trust-item"><span class="vita-trust-value">Private</span><span class="vita-trust-label">Images are not stored</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    action, learn, _spacer = st.columns((1.1, 1.1, 3))
+    with action:
+        st.button(
+            "Start a leaf screening",
+            type="primary",
+            use_container_width=True,
+            on_click=navigate_to,
+            args=("Screen a leaf",),
+        )
+    with learn:
+        st.button(
+            "Explore disease library",
+            use_container_width=True,
+            on_click=navigate_to,
+            args=("Disease library",),
+        )
+
+    section_heading(
+        "How it works",
+        "A transparent three-step workflow",
+        "Every result begins with image-quality checks and ends with confidence-aware guidance.",
     )
     left, middle, right = st.columns(3)
     with left:
         st.markdown(
-            '<div class="vita-card"><h3>01 · Screen</h3><p>Upload or capture one clear leaf. '
-            "The app checks focus, lighting, contrast, size, and visible detail first.</p></div>",
+            '<div class="vita-card"><span class="vita-step">01</span><h3>Capture clearly</h3><p>Upload or photograph one leaf. '
+            "Vita AI checks focus, lighting, contrast, dimensions, and visible detail before inference.</p></div>",
             unsafe_allow_html=True,
         )
     with middle:
         st.markdown(
-            '<div class="vita-card"><h3>02 · Understand</h3><p>See the predicted crop, condition, '
-            "confidence level, top alternatives, and the image regions that influenced the CNN.</p></div>",
+            '<div class="vita-card"><span class="vita-step">02</span><h3>Inspect the evidence</h3><p>Review the crop, condition, '
+            "confidence level, alternatives, and the regions that most influenced the CNN.</p></div>",
             unsafe_allow_html=True,
         )
     with right:
         st.markdown(
-            '<div class="vita-card"><h3>03 · Act carefully</h3><p>Read conservative prevention guidance '
-            "and know when to seek help—without pesticide dosages or false certainty.</p></div>",
+            '<div class="vita-card"><span class="vita-step">03</span><h3>Act responsibly</h3><p>Read conservative prevention guidance '
+            "and understand when professional confirmation is needed—without false certainty.</p></div>",
             unsafe_allow_html=True,
         )
-    st.write("")
-    st.subheader("How to take a useful photo")
+
+    section_heading(
+        "Capture guide",
+        "Give the model a useful image",
+        "A strong photograph reduces avoidable uncertainty before the screening begins.",
+    )
     cols = st.columns(4)
     tips = (
-        ("Natural light", "Use bright, even light without glare."),
-        ("One main leaf", "Keep the symptomatic leaf large in the frame."),
-        ("Sharp focus", "Hold steady and focus on spots or discoloration."),
-        ("Simple background", "Reduce clutter behind the leaf when possible."),
+        ("01 · Natural light", "Use bright, even light without glare."),
+        ("02 · One main leaf", "Keep the symptomatic leaf large in frame."),
+        ("03 · Sharp focus", "Focus on spots, lesions, or discoloration."),
+        ("04 · Calm background", "Reduce clutter behind the leaf."),
     )
     for column, (title, text) in zip(cols, tips, strict=True):
         with column:
             st.markdown(f"**{title}**  \n{text}")
+    st.write("")
     st.markdown(
         '<div class="vita-disclaimer">Vita AI predicts patterns learned from the PlantVillage classes. '
         "Field images, uncommon crops, mixed diseases, pests, and nutrient deficiencies may produce unreliable results. "
@@ -404,9 +654,25 @@ def render_prediction_result(
 
 def render_screening() -> None:
     hero(
-        "Disease detection",
+        "Guided screening",
         "Screen a leaf",
-        "Start with image quality, then run the CNN only when the image contains enough usable detail.",
+        "Capture one clear leaf. Vita AI validates the image before running the CNN and presenting explainable evidence.",
+    )
+    st.markdown(
+        """
+        <div class="vita-workflow" aria-label="Screening workflow">
+            <span><strong>01</strong> Select a source</span><span class="vita-workflow-arrow">→</span>
+            <span><strong>02</strong> Pass quality checks</span><span class="vita-workflow-arrow">→</span>
+            <span><strong>03</strong> Run CNN screening</span><span class="vita-workflow-arrow">→</span>
+            <span><strong>04</strong> Review evidence</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    section_heading(
+        "Image input",
+        "Choose a clear leaf photograph",
+        "For best results, keep one leaf prominent and make the affected area easy to see.",
     )
     source_mode = st.radio("Image source", ("Upload an image", "Use camera"), horizontal=True)
     source = (
@@ -415,7 +681,10 @@ def render_screening() -> None:
         else st.camera_input("Take a close, well-lit leaf photo")
     )
     if source is None:
-        st.info("Your image stays in memory for analysis and is not saved to prediction history.")
+        st.markdown(
+            '<div class="vita-empty"><strong>Ready when you are</strong><br>Your image is processed in memory and is not stored in prediction history.</div>',
+            unsafe_allow_html=True,
+        )
         return
     try:
         image = load_image(source)
@@ -468,7 +737,16 @@ def render_history() -> None:
     cols[3].metric("Diseased", int(summary["diseased"] or 0))
     cols[4].metric("Low confidence", int(summary["low_confidence"] or 0))
     if int(summary["total"] or 0) == 0:
-        st.info("No screenings have been recorded yet.")
+        st.markdown(
+            '<div class="vita-empty"><strong>No screening history yet</strong><br>Complete a leaf screening to build private, anonymous analytics on this device.</div>',
+            unsafe_allow_html=True,
+        )
+        st.button(
+            "Start the first screening",
+            type="primary",
+            on_click=navigate_to,
+            args=("Screen a leaf",),
+        )
         return
     left, right = st.columns(2)
     with left:
@@ -528,6 +806,11 @@ def render_performance() -> None:
             language="bash",
         )
         return
+    st.markdown(
+        '<div class="vita-disclaimer"><strong>Evaluation context:</strong> These results measure the controlled PlantVillage test split. They do not guarantee the same accuracy in farms, gardens, or mixed field conditions.</div>',
+        unsafe_allow_html=True,
+    )
+    st.write("")
     cols = st.columns(5)
     displayed = (
         ("Test accuracy", "accuracy"),
@@ -658,6 +941,33 @@ def render_about() -> None:
         "Responsible AI",
         "About & limitations",
         "A transparent academic decision-support system designed to demonstrate a correct CNN workflow.",
+    )
+    principles = st.columns(3)
+    principle_copy = (
+        (
+            "Confidence before certainty",
+            "The interface changes its guidance when confidence is low and never presents a screening as a confirmed diagnosis.",
+        ),
+        (
+            "Evidence before decoration",
+            "Performance figures come from evaluation artifacts, while Grad-CAM is labeled as model attention—not diseased tissue.",
+        ),
+        (
+            "Privacy by default",
+            "Uploaded images remain in memory. Only anonymous screening metadata and optional feedback are stored locally.",
+        ),
+    )
+    for column, (title, copy) in zip(principles, principle_copy, strict=True):
+        with column:
+            st.markdown(
+                f'<div class="vita-principle"><strong>{title}</strong><span>{copy}</span></div>',
+                unsafe_allow_html=True,
+            )
+
+    section_heading(
+        "System boundary",
+        "What Vita AI does—and what it cannot promise",
+        "A responsible interface makes the limits as easy to understand as the capabilities.",
     )
     left, right = st.columns(2, gap="large")
     with left:

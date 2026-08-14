@@ -25,6 +25,8 @@ It is a decision-support demonstration—not a confirmed agricultural diagnosis.
 - Evaluation dashboard generated from real artifacts only
 - Responsive Streamlit interface
 - React Bits-inspired ShinyText headings and pointer-responsive BorderGlow hero panels
+- Krea-directed botanical diagnostic artwork and a professional mobile-first design system
+- Clear capability metrics, guided screening steps, responsible-AI principles, and direct task navigation
 
 ## Quick start on Windows
 
@@ -270,3 +272,7 @@ The effects include:
 - a multi-layer mesh-gradient border and outer glow;
 - an introductory border sweep;
 - responsive sizing and `prefers-reduced-motion` accessibility.
+
+## Visual design system
+
+Version 1.3.0 introduces a project-specific interface rather than a generic dashboard theme. The visual direction uses deep forest, mineral sage, warm ivory, and restrained chartreuse to communicate plant health, scientific care, and explainable AI. The home hero artwork was generated for Vita AI through Krea and optimized to a compact progressive JPEG for fast web delivery. The interface includes keyboard-visible focus states, responsive navigation, reduced-motion support, structured empty states, and confidence-first language.

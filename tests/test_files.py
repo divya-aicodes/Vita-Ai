@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import unittest
 
-from src.config import CLASS_NAMES, LABELS_PATH, METADATA_PATH
+from PIL import Image
+
+from src.config import ASSETS_DIR, CLASS_NAMES, LABELS_PATH, METADATA_PATH
 
 
 class ProjectFileTests(unittest.TestCase):
@@ -22,6 +24,15 @@ class ProjectFileTests(unittest.TestCase):
             "source",
         ):
             self.assertIn(key, metadata)
+
+    def test_diagnostic_hero_asset_is_web_ready(self):
+        path = ASSETS_DIR / "vita-ai-diagnostic-hero.jpg"
+        self.assertTrue(path.exists())
+        self.assertLess(path.stat().st_size, 250_000)
+        with Image.open(path) as image:
+            self.assertEqual(image.format, "JPEG")
+            self.assertGreaterEqual(image.width, 1200)
+            self.assertAlmostEqual(image.width / image.height, 16 / 9, delta=0.03)
 
 
 if __name__ == "__main__":
