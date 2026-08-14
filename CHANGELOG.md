@@ -2,6 +2,14 @@
 
 All notable Vita AI changes are documented here.
 
+## 1.3.3 — 2026-08-14
+
+### Fixed
+
+- Kept the sidebar opener available whenever navigation is collapsed on laptop, desktop, tablet, and mobile screens.
+- Preserved the hidden fullscreen, Deploy, and Streamlit menu controls across all layouts.
+- Bumped the application version to 1.3.3.
+
 ## 1.3.2 — 2026-08-14
 
 ### Fixed
