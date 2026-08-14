@@ -2,6 +2,14 @@
 
 All notable Vita AI changes are documented here.
 
+## 1.3.4 — 2026-08-14
+
+### Changed
+
+- Refined the cross-device sidebar opener with a lighter ivory/sage surface, forest arrow, and softer shadow.
+- Preserved its 42×42 touch target and responsive behavior.
+- Bumped the application version to 1.3.4.
+
 ## 1.3.3 — 2026-08-14
 
 ### Fixed
