@@ -338,7 +338,7 @@ def inject_styles() -> None:
         button[title*="fullscreen" i] {
             display: none !important;
         }
-        @media (max-width: 900px) {
+        @media (max-width: 1100px) {
             .vita-trust-strip { grid-template-columns: repeat(2, 1fr); margin-inline: .5rem; }
             .vita-workflow { align-items: flex-start; flex-direction: column; }
             .vita-workflow-arrow { display: none; }
@@ -467,7 +467,7 @@ def render_home() -> None:
         """,
         unsafe_allow_html=True,
     )
-    action, learn, _spacer = st.columns((1.1, 1.1, 3))
+    action, learn, _spacer = st.columns((1.25, 1.25, 1.5))
     with action:
         st.button(
             "Start a leaf screening",
