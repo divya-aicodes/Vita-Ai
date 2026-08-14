@@ -2,6 +2,13 @@
 
 All notable Vita AI changes are documented here.
 
+## 1.3.1 — 2026-08-14
+
+### Changed
+
+- Restored the original Vita AI leaf-and-lens logo inside the existing 46×46 sidebar brand mark without changing the sidebar layout.
+- Bumped the application version to 1.3.1.
+
 ## 1.3.0 — 2026-08-14
 
 ### Added
