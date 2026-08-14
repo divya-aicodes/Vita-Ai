@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 from pathlib import Path
@@ -32,6 +33,7 @@ from src.report import build_text_report
 
 APP_ROOT = Path(__file__).resolve().parent
 HERO_ARTWORK_PATH = APP_ROOT / "assets" / "vita-ai-diagnostic-hero.jpg"
+BRAND_ICON_PATH = APP_ROOT / "assets" / "vita-ai-icon.png"
 LOGGER = logging.getLogger(__name__)
 
 st.set_page_config(
@@ -120,11 +122,18 @@ def inject_styles() -> None:
             height: 46px;
             border: 1px solid rgba(220,233,135,.55);
             border-radius: 15px;
+            overflow: hidden;
             color: var(--lime-300);
-            background: rgba(255,255,255,.055);
+            background: #f8faf5;
             font-size: 1.22rem;
             font-weight: 850;
             box-shadow: inset 0 0 18px rgba(207,225,108,.08);
+        }
+        .vita-brand-mark img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
         .vita-brand-name { color: #fff; font-size: 1.04rem; font-weight: 800; letter-spacing: .02em; }
         .vita-brand-sub { color: #b9c9c0; font-size: .72rem; line-height: 1.35; }
@@ -415,10 +424,18 @@ def navigate_to(page: str) -> None:
 
 
 def sidebar() -> str:
+    brand_mark = "V"
+    if BRAND_ICON_PATH.exists():
+        encoded_icon = base64.b64encode(BRAND_ICON_PATH.read_bytes()).decode("ascii")
+        brand_mark = (
+            '<img src="data:image/png;base64,'
+            f'{encoded_icon}" alt="Vita AI logo">'
+        )
+
     st.sidebar.markdown(
         f"""
         <div class="vita-brand">
-            <div class="vita-brand-mark">V</div>
+            <div class="vita-brand-mark">{brand_mark}</div>
             <div>
                 <div class="vita-brand-name">{APP_TITLE}</div>
                 <div class="vita-brand-sub">Explainable plant-health AI</div>
