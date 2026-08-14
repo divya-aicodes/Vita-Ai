@@ -15,7 +15,7 @@ ASSETS_DIR = PROJECT_ROOT / "assets"
 
 APP_TITLE = "ᕓ𐌉𐌕𐌀 𐌀𐌉"
 APP_SUBTITLE = "An Explainable CNN-Based Plant Disease Screening and Advisory System"
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.3.2"
 MODEL_VERSION = "mobilenetv2-plantvillage-1.0"
 
 MODEL_PATH = MODELS_DIR / "plant_disease_mobilenetv2.keras"
