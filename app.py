@@ -352,11 +352,16 @@ def inject_styles() -> None:
             display: inline-flex !important;
             width: 42px !important;
             height: 42px !important;
-            border: 1px solid rgba(255,255,255,.22) !important;
+            border: 1px solid rgba(13,53,45,.2) !important;
             border-radius: 13px !important;
-            color: #fff !important;
-            background: var(--forest-900) !important;
-            box-shadow: 0 8px 24px rgba(8,43,36,.22) !important;
+            color: var(--forest-900) !important;
+            background: rgba(255,255,255,.94) !important;
+            box-shadow: 0 8px 24px rgba(8,43,36,.14) !important;
+            backdrop-filter: blur(10px);
+        }
+        [data-testid="stExpandSidebarButton"]:hover {
+            border-color: rgba(13,53,45,.38) !important;
+            background: var(--sage-100) !important;
         }
         [data-testid="stSidebarCollapseButton"] button {
             color: #fff !important;
