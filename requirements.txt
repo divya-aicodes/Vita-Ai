@@ -4,6 +4,6 @@ numpy>=1.26,<3
 pillow>=10.4,<13
 pandas>=2.2,<3
 scikit-learn>=1.5,<2
-matplotlib>=3.9,<4
+matplotlib>=3.11.1,<4
 huggingface-hub>=0.27,<2
 
