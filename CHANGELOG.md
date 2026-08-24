@@ -2,6 +2,22 @@
 
 All notable Vita AI changes are documented here.
 
+## 1.4.0 — 2026-08-25
+
+### Added
+
+- Added required known-plant selection so screening candidates cannot belong to another crop.
+- Added selected-plant support, within-plant disease scoring, separation checks, and an explicit `No reliable match` outcome.
+- Added regression tests for cross-plant suppression, accepted matches, ambiguous matches, and unsupported crops.
+
+### Changed
+
+- Calibrated conservative acceptance thresholds on the 10,709-image controlled test split: 97.89% coverage and 99.98% accuracy among accepted results.
+- Withholds disease guidance and Grad-CAM whenever a result fails reliability checks.
+- Renamed image quality to photo quality and states that it measures technical image properties, not diagnostic accuracy.
+- Updated reports and stored history to record withheld results as unknown instead of diagnoses.
+- Bumped the application version to 1.4.0.
+
 ## 1.3.4 — 2026-08-14
 
 ### Changed

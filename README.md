@@ -13,6 +13,8 @@ It is a decision-support demonstration—not a confirmed agricultural diagnosis.
 - JPG, JPEG, and PNG upload plus camera capture
 - Genuine-image verification, EXIF orientation handling, and RGB conversion
 - Blur, brightness, contrast, dimensions, and visible-content checks
+- Required known-plant selection to prevent cross-crop disease results
+- Conservative reliability checks that withhold ambiguous or incompatible predictions
 - MobileNetV2 transfer-learning training pipeline
 - Optional custom CNN academic baseline
 - 70-entry disease library: 38 AI-supported PlantVillage classes plus 32 clearly marked reference-only conditions
@@ -78,6 +80,8 @@ No image classifier is “perfectly accurate.” Accuracy depends on:
 The optional downloadable model’s model card reports 98.75% test accuracy on an augmented PlantVillage test set. That is a third-party, self-reported dataset result—not a promise of field accuracy. The app deliberately does not add that number to its performance dashboard. Use `evaluate.py` with an untouched local test set to produce locally verified evidence.
 
 This repository includes a local evaluation of that model on the official leaf-grouped PlantVillage colour test split: 10,709 images across 38 classes, with 99.18% accuracy, 99.95% top-three accuracy, and 98.83% macro F1. The generated metrics, class report, and confusion matrix are stored in `results/`. These controlled-dataset results still do not guarantee field performance.
+
+The screening workflow additionally asks the user to identify the known plant and ranks only conditions supported for that plant. A result is shown only when selected-plant support is at least 70%, the leading within-plant match is at least 95%, and its margin over the next candidate is at least 15 percentage points. On the same controlled test split, this policy accepted 97.89% of images and was correct on 99.98% of accepted images. It is an abstention policy—not a claim of 100% accuracy—and must be recalibrated on representative field images before production use.
 
 ## Dataset layout
 

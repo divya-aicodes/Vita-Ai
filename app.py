@@ -24,7 +24,7 @@ from src.config import (
     load_model_metadata,
 )
 from src.database import PredictionDatabase
-from src.disease_info import library_conditions
+from src.disease_info import get_disease_info, library_conditions
 from src.model import ModelUnavailableError, load_trained_model
 from src.prediction import predict_image
 from src.preprocessing import ImageValidationError, load_image
@@ -542,8 +542,8 @@ def render_home() -> None:
         )
     with middle:
         st.markdown(
-            '<div class="vita-card"><span class="vita-step">02</span><h3>Inspect the evidence</h3><p>Review the crop, condition, '
-            "confidence level, alternatives, and the regions that most influenced the CNN.</p></div>",
+            '<div class="vita-card"><span class="vita-step">02</span><h3>Inspect the evidence</h3><p>Confirm the known plant, review the '
+            "condition candidates, reliability signals, and the regions that influenced the CNN.</p></div>",
             unsafe_allow_html=True,
         )
     with right:
@@ -578,9 +578,9 @@ def render_home() -> None:
 
 
 def render_quality(quality) -> None:
-    st.markdown("#### Image-quality check")
+    st.markdown("#### Photo-quality check")
     cols = st.columns(4)
-    cols[0].metric("Overall score", f"{quality.score:.0f}/100")
+    cols[0].metric("Technical photo score", f"{quality.score:.0f}/100")
     cols[1].metric("Brightness", f"{quality.brightness:.0f}/255")
     cols[2].metric("Contrast", f"{quality.contrast:.1f}")
     cols[3].metric("Sharpness", f"{quality.sharpness:.0f}")
@@ -588,15 +588,19 @@ def render_quality(quality) -> None:
         st.warning(warning)
     if not quality.warnings:
         st.success("The image passed the basic quality checks.")
+    st.caption(
+        "This score measures lighting, focus, resolution, contrast, and visible detail only. "
+        "It is not diagnostic accuracy or model confidence."
+    )
 
 
 def persist_prediction(result, quality, metadata) -> int:
     alternatives = [f"{item.crop} — {item.condition}" for item in result.alternatives]
     return database().save_prediction(
-        crop_name=result.primary.crop,
-        disease_name=result.primary.condition,
-        health_status=result.primary.status,
-        confidence=result.primary.confidence,
+        crop_name=result.selected_crop or result.primary.crop,
+        disease_name=result.primary.condition if result.reliable else "No reliable match",
+        health_status=result.primary.status if result.reliable else "Unknown",
+        confidence=result.primary.confidence if result.reliable else 0.0,
         alternatives=alternatives,
         image_quality_score=quality.score,
         inference_time_ms=result.inference_time_ms,
@@ -608,41 +612,60 @@ def render_prediction_result(
     result, quality, prediction_id: int, model, labels, metadata, image
 ) -> None:
     primary = result.primary
-    status_icon = "✓" if primary.status == "Healthy" else "!"
-    st.markdown(
-        f"""
-        <div class="vita-result">
-            <div class="crop">{primary.crop} · {primary.status}</div>
-            <div class="condition">{status_icon} {primary.condition}</div>
-            <div><strong>{primary.confidence:.1%} confidence</strong> · {result.confidence_level} confidence</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    if result.reliable:
+        status_icon = "✓" if primary.status == "Healthy" else "!"
+        st.markdown(
+            f"""
+            <div class="vita-result">
+                <div class="crop">{result.selected_crop or primary.crop} · {primary.status}</div>
+                <div class="condition">{status_icon} {primary.condition}</div>
+                <div><strong>{primary.confidence:.1%} within-plant match</strong> · {result.confidence_level}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.info(result.guidance)
+    else:
+        st.markdown(
+            f"""
+            <div class="vita-result">
+                <div class="crop">{result.selected_crop or primary.crop} · Result withheld</div>
+                <div class="condition">No reliable disease match</div>
+                <div>The model did not pass the plant-compatibility and disease-separation checks.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.warning(result.guidance)
+
+    metrics = st.columns(4)
+    metrics[0].metric("Selected-plant support", f"{result.crop_support:.1%}")
+    metrics[1].metric("Within-plant match", f"{primary.confidence:.1%}")
+    metrics[2].metric("Photo quality", f"{quality.score:.0f}/100")
+    metrics[3].metric("Inference", f"{result.inference_time_ms:.0f} ms")
+    st.caption(
+        "These model scores are screening signals, not guaranteed probabilities of a correct diagnosis."
     )
-    st.info(result.guidance)
-    metrics = st.columns(3)
-    metrics[0].metric("Confidence", f"{primary.confidence:.1%}")
-    metrics[1].metric("Image quality", f"{quality.score:.0f}/100")
-    metrics[2].metric("Inference", f"{result.inference_time_ms:.0f} ms")
 
     tab_details, tab_explain, tab_alternatives = st.tabs(
         ("What this may mean", "Why the model looked here", "Top predictions")
     )
     with tab_details:
         info = result.disease_info
-        st.markdown(f"**Overview**  \n{info.description}")
-        st.markdown(f"**Common visible symptoms**  \n{info.symptoms}")
-        if primary.confidence >= 0.55:
-            st.markdown(f"**General prevention**  \n{info.prevention}")
-        else:
+        if not result.reliable:
             st.warning(
-                "Prevention guidance is hidden because confidence is low. Try another image first."
+                "Disease information and prevention guidance are withheld because this screening "
+                "did not produce a reliable match."
             )
-        st.warning(info.expert_warning)
+        else:
+            st.markdown(f"**Overview**  \n{info.description}")
+            st.markdown(f"**Common visible symptoms**  \n{info.symptoms}")
+            st.markdown(f"**General prevention**  \n{info.prevention}")
+            st.warning(info.expert_warning)
     with tab_explain:
-        if primary.confidence < 0.55:
+        if not result.reliable:
             st.info(
-                "Explainability is withheld for this low-confidence result; capture another image."
+                "Explainability is withheld because no reliable disease match was produced."
             )
         else:
             try:
@@ -669,11 +692,15 @@ def render_prediction_result(
                 "Rank": rank,
                 "Crop": item.crop,
                 "Condition": item.condition,
-                "Confidence": f"{item.confidence:.1%}",
+                "Within-plant score": f"{item.confidence:.1%}",
             }
             for rank, item in enumerate((primary, *result.alternatives), start=1)
         ]
         st.dataframe(rows, hide_index=True, use_container_width=True)
+        st.caption(
+            "Candidate scores are normalized only across conditions supported for the selected plant. "
+            "They are not diagnostic accuracy."
+        )
 
     report = build_text_report(result, quality, metadata.model_version)
     st.download_button(
@@ -700,23 +727,31 @@ def render_screening() -> None:
     hero(
         "Guided screening",
         "Screen a leaf",
-        "Capture one clear leaf. Vita AI validates the image before running the CNN and presenting explainable evidence.",
+        "Choose the known plant, then add one clear leaf photo. Vita AI withholds results that do not pass its reliability checks.",
     )
     st.markdown(
         """
         <div class="vita-workflow" aria-label="Screening workflow">
-            <span><strong>01</strong> Select a source</span><span class="vita-workflow-arrow">→</span>
-            <span><strong>02</strong> Pass quality checks</span><span class="vita-workflow-arrow">→</span>
-            <span><strong>03</strong> Run CNN screening</span><span class="vita-workflow-arrow">→</span>
-            <span><strong>04</strong> Review evidence</span>
+            <span><strong>01</strong> Select the plant</span><span class="vita-workflow-arrow">→</span>
+            <span><strong>02</strong> Add a clear photo</span><span class="vita-workflow-arrow">→</span>
+            <span><strong>03</strong> Run constrained screening</span><span class="vita-workflow-arrow">→</span>
+            <span><strong>04</strong> Review or retry</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
     section_heading(
         "Image input",
-        "Choose a clear leaf photograph",
-        "For best results, keep one leaf prominent and make the affected area easy to see.",
+        "Identify the plant and choose a clear leaf photograph",
+        "The selected plant prevents the model from returning a disease belonging to another crop.",
+    )
+    supported_crops = sorted({get_disease_info(label).crop for label in load_class_names()})
+    selected_crop = st.selectbox(
+        "Which plant is shown?",
+        supported_crops,
+        index=None,
+        placeholder="Select the known plant",
+        help="Choose the plant you know is in the photo. Vita AI will screen only its supported conditions.",
     )
     source_mode = st.radio("Image source", ("Upload an image", "Use camera"), horizontal=True)
     source = (
@@ -729,6 +764,9 @@ def render_screening() -> None:
             '<div class="vita-empty"><strong>Ready when you are</strong><br>Your image is processed in memory and is not stored in prediction history.</div>',
             unsafe_allow_html=True,
         )
+        return
+    if selected_crop is None:
+        st.info("Select the plant before analyzing the leaf.")
         return
     try:
         image = load_image(source)
@@ -754,7 +792,7 @@ def render_screening() -> None:
     try:
         model, labels, metadata = model_bundle()
         with st.spinner("Analyzing visible patterns…"):
-            result = predict_image(model, image, labels, metadata)
+            result = predict_image(model, image, labels, metadata, expected_crop=selected_crop)
         prediction_id = persist_prediction(result, quality, metadata)
         st.session_state["last_prediction_id"] = prediction_id
         render_prediction_result(result, quality, prediction_id, model, labels, metadata, image)

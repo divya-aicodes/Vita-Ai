@@ -113,6 +113,67 @@ class PredictionTests(unittest.TestCase):
         self.assertEqual(result.confidence_level, "High")
         self.assertEqual(len(result.alternatives), 2)
 
+    def test_crop_constraint_prevents_cross_plant_result(self):
+        probabilities = np.zeros(len(CLASS_NAMES), dtype=np.float32)
+        probabilities[5] = 0.95  # Cherry powdery mildew
+        probabilities[29] = 0.03  # Tomato early blight
+        probabilities[30] = 0.02  # Tomato late blight
+        result = predict_image(
+            FakeModel(probabilities),
+            Image.new("RGB", (300, 300), "green"),
+            CLASS_NAMES,
+            ModelMetadata(),
+            expected_crop="Tomato",
+        )
+        self.assertEqual(result.selected_crop, "Tomato")
+        self.assertTrue(all(item.crop == "Tomato" for item in (result.primary, *result.alternatives)))
+        self.assertAlmostEqual(result.crop_support, 0.05, places=5)
+        self.assertFalse(result.reliable)
+        self.assertEqual(result.confidence_level, "Unreliable")
+
+    def test_crop_constraint_accepts_clear_within_plant_match(self):
+        probabilities = np.zeros(len(CLASS_NAMES), dtype=np.float32)
+        probabilities[0] = 0.28
+        probabilities[29] = 0.70
+        probabilities[30] = 0.02
+        result = predict_image(
+            FakeModel(probabilities),
+            Image.new("RGB", (300, 300), "green"),
+            CLASS_NAMES,
+            ModelMetadata(),
+            expected_crop="tomato",
+        )
+        self.assertEqual(result.primary.condition, "Early Blight")
+        self.assertAlmostEqual(result.primary.confidence, 70 / 72, places=5)
+        self.assertAlmostEqual(result.crop_support, 0.72, places=5)
+        self.assertTrue(result.reliable)
+
+    def test_crop_constraint_rejects_ambiguous_disease_match(self):
+        probabilities = np.zeros(len(CLASS_NAMES), dtype=np.float32)
+        probabilities[0] = 0.25
+        probabilities[29] = 0.40
+        probabilities[30] = 0.35
+        result = predict_image(
+            FakeModel(probabilities),
+            Image.new("RGB", (300, 300), "green"),
+            CLASS_NAMES,
+            ModelMetadata(),
+            expected_crop="Tomato",
+        )
+        self.assertFalse(result.reliable)
+        self.assertLess(result.primary.confidence, 0.55)
+
+    def test_crop_constraint_rejects_unsupported_crop(self):
+        probabilities = np.full(len(CLASS_NAMES), 1 / len(CLASS_NAMES), dtype=np.float32)
+        with self.assertRaisesRegex(ValueError, "Unsupported crop"):
+            predict_image(
+                FakeModel(probabilities),
+                Image.new("RGB", (300, 300), "green"),
+                CLASS_NAMES,
+                ModelMetadata(),
+                expected_crop="Banana",
+            )
+
     def test_confidence_boundaries(self):
         self.assertEqual(confidence_message(0.80)[0], "High")
         self.assertEqual(confidence_message(0.55)[0], "Moderate")

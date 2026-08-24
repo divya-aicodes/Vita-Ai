@@ -15,7 +15,7 @@ ASSETS_DIR = PROJECT_ROOT / "assets"
 
 APP_TITLE = "ᕓ𐌉𐌕𐌀 𐌀𐌉"
 APP_SUBTITLE = "An Explainable CNN-Based Plant Disease Screening and Advisory System"
-APP_VERSION = "1.3.4"
+APP_VERSION = "1.4.0"
 MODEL_VERSION = "mobilenetv2-plantvillage-1.0"
 
 MODEL_PATH = MODELS_DIR / "plant_disease_mobilenetv2.keras"
@@ -32,6 +32,9 @@ MAX_FILE_SIZE_MB = 10
 SUPPORTED_FORMATS = {"JPEG", "PNG"}
 HIGH_CONFIDENCE = 0.80
 LOW_CONFIDENCE = 0.55
+CROP_SUPPORT_THRESHOLD = 0.70
+DISEASE_ACCEPT_THRESHOLD = 0.95
+DISEASE_MARGIN_THRESHOLD = 0.15
 
 CLASS_NAMES = [
     "Apple___Apple_scab",
