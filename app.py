@@ -664,9 +664,7 @@ def render_prediction_result(
             st.warning(info.expert_warning)
     with tab_explain:
         if not result.reliable:
-            st.info(
-                "Explainability is withheld because no reliable disease match was produced."
-            )
+            st.info("Explainability is withheld because no reliable disease match was produced.")
         else:
             try:
                 from src.gradcam import explain_prediction

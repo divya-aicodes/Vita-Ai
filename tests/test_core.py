@@ -126,7 +126,9 @@ class PredictionTests(unittest.TestCase):
             expected_crop="Tomato",
         )
         self.assertEqual(result.selected_crop, "Tomato")
-        self.assertTrue(all(item.crop == "Tomato" for item in (result.primary, *result.alternatives)))
+        self.assertTrue(
+            all(item.crop == "Tomato" for item in (result.primary, *result.alternatives))
+        )
         self.assertAlmostEqual(result.crop_support, 0.05, places=5)
         self.assertFalse(result.reliable)
         self.assertEqual(result.confidence_level, "Unreliable")
