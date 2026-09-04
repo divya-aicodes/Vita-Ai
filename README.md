@@ -177,7 +177,11 @@ Run all repository quality gates locally:
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-GitHub Actions runs the same gates for every pull request and every push to `main`.
+GitHub Actions runs a staged pipeline for every pull request and every push to `main`: code
+quality, safety-focused unit tests, full production dependency checks, and an application/model
+contract check. Pull requests also receive a high-severity dependency review. See
+[`docs/WORKFLOW_PIPELINE.md`](docs/WORKFLOW_PIPELINE.md) for the problem statement, architecture,
+CI stages, and deployment flow.
 
 ## Project structure
 
