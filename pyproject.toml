@@ -1,10 +1,16 @@
+[project]
+name = "vita-ai"
+version = "0.1.0"
+description = "A transparent plant-health screening prototype"
+requires-python = ">=3.11"
+
 [tool.ruff]
-target-version = "py312"
 line-length = 100
+target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "BLE", "RUF", "FLY"]
-ignore = ["E501", "RUF001"]
+select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
-"app.py" = ["BLE001"]
+"tests/*.py" = ["E402"]
+

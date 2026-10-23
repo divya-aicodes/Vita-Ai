@@ -1,1105 +1,388 @@
-"""Streamlit interface for ᕓ𐌉𐌕𐌀 𐌀𐌉."""
+"""Vita AI Streamlit interface."""
 
 from __future__ import annotations
 
-import base64
 import json
-import logging
+import sys
 from pathlib import Path
 
 import streamlit as st
 
-from src.animations import render_animated_hero
-from src.config import (
-    APP_SUBTITLE,
-    APP_TITLE,
-    APP_VERSION,
-    CLASSIFICATION_REPORT_PATH,
-    CONFUSION_MATRIX_PATH,
-    HISTORY_PATH,
-    METRICS_PATH,
-    MODEL_PATH,
-    ensure_runtime_directories,
-    load_class_names,
-    load_model_metadata,
-)
-from src.database import PredictionDatabase
-from src.disease_info import get_disease_info, library_conditions
-from src.model import ModelUnavailableError, load_trained_model
-from src.prediction import predict_image
-from src.preprocessing import ImageValidationError, load_image
-from src.quality_checker import assess_image_quality
-from src.report import build_text_report
+PROJECT_ROOT = Path(__file__).resolve().parent
+SRC_DIR = PROJECT_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
-APP_ROOT = Path(__file__).resolve().parent
-HERO_ARTWORK_PATH = APP_ROOT / "assets" / "vita-ai-diagnostic-hero.jpg"
-BRAND_ICON_PATH = APP_ROOT / "assets" / "vita-ai-icon.png"
-LOGGER = logging.getLogger(__name__)
+from vita_ai.config import (  # noqa: E402
+    APP_NAME,
+    APP_VERSION,
+    DISTRIBUTIONS,
+    ENVIRONMENTS,
+    SYMPTOMS,
+)
+from vita_ai.image_quality import ImageValidationError, assess_photo, decode_image  # noqa: E402
+from vita_ai.knowledge import crops, load_conditions  # noqa: E402
+from vita_ai.report import build_report  # noqa: E402
+from vita_ai.screening import screen_case  # noqa: E402
+from vita_ai.storage import list_screenings, save_feedback, save_screening  # noqa: E402
 
 st.set_page_config(
-    page_title=f"{APP_TITLE} · Plant Health Screening",
+    page_title="Vita AI · Plant Health Screening",
     page_icon="🌿",
     layout="wide",
-    initial_sidebar_state="auto",
+    initial_sidebar_state="expanded",
+)
+
+st.markdown(
+    """
+    <style>
+      :root { --ink: #163126; --green: #286444; --mint: #eef6f0; --line: #d7e5db; }
+      .stApp { background: #fbfcfa; color: var(--ink); }
+      [data-testid="stSidebar"] { background: #f1f6f2; border-right: 1px solid var(--line); }
+      .hero { background: #eef6f0; border: 1px solid #d2e3d7; border-radius: 18px;
+              padding: 2rem 2.2rem; margin-bottom: 1.25rem; }
+      .hero h1 { color: #173f2a; margin: 0 0 .35rem; font-size: 2.55rem; }
+      .hero p { color: #456052; max-width: 760px; font-size: 1.05rem; margin: 0; }
+      .eyebrow { color: #2f6d4a; font-weight: 700; letter-spacing: .08em;
+                 text-transform: uppercase; font-size: .75rem; }
+      .notice { border-left: 4px solid #c28a25; background: #fff8e8; padding: .85rem 1rem;
+                border-radius: 8px; margin: .8rem 0 1.1rem; color: #604817; }
+      .card { border: 1px solid var(--line); border-radius: 14px; padding: 1rem 1.1rem;
+              background: white; min-height: 150px; }
+      .card h3 { color: #214d35; margin-top: 0; }
+      .score { font-variant-numeric: tabular-nums; color: #286444; font-weight: 700; }
+      div[data-testid="stMetric"] { background: white; border: 1px solid var(--line);
+              padding: .75rem 1rem; border-radius: 12px; }
+      .small-note { color: #5d7166; font-size: .88rem; }
+      .status-good { color: #1f6a3c; font-weight: 700; }
+      .status-usable { color: #8a631b; font-weight: 700; }
+      .status-poor { color: #a23c32; font-weight: 700; }
+      .stButton > button, .stDownloadButton > button { border-radius: 9px; }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 
-def inject_styles() -> None:
+def page_header(title: str, subtitle: str) -> None:
     st.markdown(
-        """
-        <style>
-        :root {
-            --forest-950: #082b24;
-            --forest-900: #0d352d;
-            --forest-800: #16493c;
-            --forest-700: #24614f;
-            --sage-100: #e9f0e7;
-            --sage-50: #f3f7f1;
-            --lime-400: #cfe16c;
-            --lime-300: #dce987;
-            --paper: #fafbf7;
-            --surface: #ffffff;
-            --ink: #14231d;
-            --muted: #617069;
-            --line: #dce5dc;
-            --warning: #8a6418;
-            --radius-lg: 24px;
-            --radius-md: 16px;
-            --shadow-sm: 0 8px 24px rgba(12, 52, 43, .055);
-            --shadow-md: 0 18px 50px rgba(12, 52, 43, .09);
-        }
-        html { scroll-behavior: smooth; }
-        body, .stApp {
-            font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
-        }
-        .stApp {
-            background:
-                radial-gradient(circle at 88% -4%, rgba(207,225,108,.16), transparent 31rem),
-                radial-gradient(circle at 5% 42%, rgba(110,163,139,.09), transparent 26rem),
-                linear-gradient(180deg, #fbfcf8 0%, #f4f7f2 100%);
-            color: var(--ink);
-        }
-        [data-testid="stAppViewContainer"] > .main .block-container {
-            max-width: 1240px;
-            padding-top: 1.25rem;
-            padding-bottom: 4rem;
-        }
-        [data-testid="stHeader"] { background: transparent; }
-        [data-testid="stSidebar"] {
-            background:
-                radial-gradient(circle at 18% 5%, rgba(207,225,108,.13), transparent 15rem),
-                linear-gradient(180deg, var(--forest-950), var(--forest-900));
-            border-right: 1px solid rgba(255,255,255,.08);
-        }
-        [data-testid="stSidebar"] > div:first-child { padding-top: 1rem; }
-        [data-testid="stSidebar"] * { color: #f1f5ef; }
-        [data-testid="stSidebar"] div[role="radiogroup"] label {
-            border: 1px solid transparent;
-            border-radius: 13px;
-            padding: .48rem .65rem;
-            margin-bottom: .18rem;
-            transition: background-color .16s ease, border-color .16s ease;
-        }
-        [data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-            background: rgba(255,255,255,.06);
-            border-color: rgba(255,255,255,.08);
-        }
-        [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
-            background: rgba(207,225,108,.14);
-            border-color: rgba(207,225,108,.28);
-            box-shadow: inset 3px 0 0 var(--lime-400);
-        }
-        .vita-brand {
-            display: flex;
-            align-items: center;
-            gap: .78rem;
-            padding: .4rem .1rem 1rem;
-        }
-        .vita-brand-mark {
-            display: grid;
-            place-items: center;
-            width: 46px;
-            height: 46px;
-            border: 1px solid rgba(220,233,135,.55);
-            border-radius: 15px;
-            overflow: hidden;
-            color: var(--lime-300);
-            background: #f8faf5;
-            font-size: 1.22rem;
-            font-weight: 850;
-            box-shadow: inset 0 0 18px rgba(207,225,108,.08);
-        }
-        .vita-brand-mark img {
-            display: block;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .vita-brand-name { color: #fff; font-size: 1.04rem; font-weight: 800; letter-spacing: .02em; }
-        .vita-brand-sub { color: #b9c9c0; font-size: .72rem; line-height: 1.35; }
-        .vita-sidebar-label {
-            margin: .25rem 0 .45rem;
-            color: #91a69c;
-            font-size: .68rem;
-            font-weight: 800;
-            letter-spacing: .14em;
-            text-transform: uppercase;
-        }
-        .vita-kicker {
-            color: var(--forest-700);
-            font-size: .76rem;
-            font-weight: 800;
-            letter-spacing: .16em;
-            text-transform: uppercase;
-            margin-bottom: .4rem;
-        }
-        .vita-card {
-            position: relative;
-            overflow: hidden;
-            background: rgba(255,255,255,.9);
-            border: 1px solid var(--line);
-            border-radius: var(--radius-lg);
-            padding: 1.35rem 1.4rem;
-            height: 100%;
-            box-shadow: var(--shadow-sm);
-        }
-        .vita-card::after {
-            content: "";
-            position: absolute;
-            width: 94px;
-            height: 94px;
-            right: -44px;
-            bottom: -48px;
-            border-radius: 50%;
-            background: rgba(207,225,108,.13);
-        }
-        .vita-card h3 { margin: 0 0 .55rem; color: var(--forest-900); font-size: 1rem; }
-        .vita-card p { margin: 0; color: var(--muted); line-height: 1.58; }
-        .vita-step {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            height: 32px;
-            margin-bottom: .9rem;
-            border-radius: 10px;
-            background: var(--sage-100);
-            color: var(--forest-800);
-            font-size: .78rem;
-            font-weight: 850;
-        }
-        .vita-trust-strip {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 1px;
-            overflow: hidden;
-            margin: .25rem 1.5rem 1.35rem;
-            border: 1px solid var(--line);
-            border-radius: 17px;
-            background: var(--line);
-            box-shadow: var(--shadow-sm);
-        }
-        .vita-trust-item { background: rgba(255,255,255,.94); padding: .85rem 1rem; }
-        .vita-trust-value { display: block; color: var(--forest-900); font-size: 1rem; font-weight: 850; }
-        .vita-trust-label { color: var(--muted); font-size: .72rem; }
-        .vita-section-head { margin: 2rem 0 .85rem; }
-        .vita-section-head small {
-            color: var(--forest-700);
-            font-size: .68rem;
-            font-weight: 850;
-            letter-spacing: .14em;
-            text-transform: uppercase;
-        }
-        .vita-section-head h2 {
-            margin: .22rem 0 .35rem;
-            color: var(--forest-950);
-            font-size: clamp(1.45rem, 3vw, 2.05rem);
-            letter-spacing: -.025em;
-        }
-        .vita-section-head p { max-width: 48rem; margin: 0; color: var(--muted); }
-        .vita-workflow {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: .8rem;
-            margin: .25rem 0 1.25rem;
-            padding: .85rem 1rem;
-            border: 1px solid var(--line);
-            border-radius: var(--radius-md);
-            background: rgba(255,255,255,.72);
-            color: var(--muted);
-            font-size: .8rem;
-        }
-        .vita-workflow strong { color: var(--forest-800); }
-        .vita-workflow-arrow { color: #9aaba2; }
-        .vita-empty {
-            padding: 2.2rem;
-            border: 1px dashed #b9c9bd;
-            border-radius: var(--radius-lg);
-            background: rgba(255,255,255,.62);
-            text-align: center;
-            color: var(--muted);
-        }
-        .vita-result {
-            background:
-                radial-gradient(circle at 92% 20%, rgba(207,225,108,.24), transparent 10rem),
-                linear-gradient(135deg, #e8f1e8, #f9faf4);
-            border: 1px solid #c7d8ca;
-            border-left: 5px solid var(--forest-700);
-            border-radius: var(--radius-lg);
-            padding: 1.4rem 1.55rem;
-            box-shadow: var(--shadow-sm);
-        }
-        .vita-result .condition { color: var(--forest-900); font-size: 1.75rem; font-weight: 850; letter-spacing: -.025em; }
-        .vita-result .crop { color: var(--muted); font-size: .9rem; text-transform: uppercase; letter-spacing: .12em; }
-        .vita-disclaimer {
-            background: #fff9e9;
-            border: 1px solid #ead9aa;
-            border-left: 4px solid #c39430;
-            color: #5d4918;
-            border-radius: var(--radius-md);
-            padding: 1rem 1.05rem;
-            font-size: .9rem;
-            line-height: 1.55;
-        }
-        .model-ready { color: var(--lime-300); font-weight: 750; }
-        .model-missing { color: #ffd591; font-weight: 700; }
-        .vita-badge {
-            display: inline-block;
-            border-radius: 999px;
-            padding: .22rem .58rem;
-            margin: 0 .35rem .65rem 0;
-            font-size: .72rem;
-            font-weight: 800;
-            letter-spacing: .04em;
-            text-transform: uppercase;
-        }
-        .vita-badge-ai { background: var(--sage-100); color: var(--forest-900); }
-        .vita-badge-reference { background: #eef0e8; color: #59635d; }
-        .vita-badge-category { background: #f4f0d8; color: #655d27; }
-        [data-testid="stMetric"] {
-            background: rgba(255,255,255,.88);
-            border: 1px solid var(--line);
-            border-radius: var(--radius-md);
-            padding: .95rem 1.05rem;
-            box-shadow: 0 6px 20px rgba(12,52,43,.035);
-        }
-        [data-testid="stMetricValue"] { color: var(--forest-900); font-weight: 820; }
-        .stButton > button, .stDownloadButton > button {
-            border-radius: 999px;
-            font-weight: 750;
-            min-height: 2.8rem;
-            border-color: var(--forest-700);
-            transition: transform .14s ease, box-shadow .14s ease, background-color .14s ease;
-        }
-        .stButton > button:hover, .stDownloadButton > button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 8px 22px rgba(13,53,45,.12);
-        }
-        .stButton > button[kind="primary"] {
-            background: var(--forest-900);
-            color: white;
-        }
-        .stButton > button:focus-visible, .stDownloadButton > button:focus-visible,
-        input:focus-visible, textarea:focus-visible {
-            outline: 3px solid rgba(207,225,108,.55) !important;
-            outline-offset: 2px;
-        }
-        [data-testid="stFileUploaderDropzone"] {
-            min-height: 170px;
-            border: 1.5px dashed #77998a;
-            border-radius: var(--radius-lg);
-            background: rgba(255,255,255,.75);
-        }
-        [data-testid="stExpander"] {
-            overflow: hidden;
-            border-color: var(--line);
-            border-radius: var(--radius-md);
-            background: rgba(255,255,255,.7);
-        }
-        [data-baseweb="tab-list"] { gap: .35rem; }
-        [data-baseweb="tab"] {
-            border-radius: 999px;
-            padding-left: 1rem;
-            padding-right: 1rem;
-        }
-        [data-baseweb="tab"][aria-selected="true"] { background: var(--sage-100); }
-        [data-testid="stDataFrame"] { border-radius: var(--radius-md); overflow: hidden; }
-        .vita-principle {
-            min-height: 148px;
-            padding: 1.2rem;
-            border: 1px solid var(--line);
-            border-radius: var(--radius-md);
-            background: rgba(255,255,255,.8);
-        }
-        .vita-principle strong { display: block; margin-bottom: .4rem; color: var(--forest-900); }
-        .vita-principle span { color: var(--muted); font-size: .9rem; line-height: 1.55; }
-        footer { visibility: hidden; }
-        #MainMenu { visibility: hidden; }
-        [data-testid="stToolbar"] {
-            display: flex !important;
-            position: absolute !important;
-            inset: .65rem auto auto .65rem !important;
-            z-index: 1001 !important;
-            width: auto !important;
-            height: auto !important;
-        }
-        [data-testid="stToolbar"] [data-testid="stBaseButton-header"],
-        [data-testid="stToolbar"] [data-testid="stMainMenuButton"] {
-            display: none !important;
-        }
-        [data-testid="stExpandSidebarButton"] {
-            display: inline-flex !important;
-            width: 42px !important;
-            height: 42px !important;
-            border: 1px solid rgba(13,53,45,.2) !important;
-            border-radius: 13px !important;
-            color: var(--forest-900) !important;
-            background: rgba(255,255,255,.94) !important;
-            box-shadow: 0 8px 24px rgba(8,43,36,.14) !important;
-            backdrop-filter: blur(10px);
-        }
-        [data-testid="stExpandSidebarButton"]:hover {
-            border-color: rgba(13,53,45,.38) !important;
-            background: var(--sage-100) !important;
-        }
-        [data-testid="stSidebarCollapseButton"] button {
-            color: #fff !important;
-            background: rgba(255,255,255,.1) !important;
-        }
-        [data-testid="stDecoration"] { display: none !important; }
-        button[data-testid="stBaseButton-headerNoPadding"] { color: var(--forest-900); }
-        @media (prefers-reduced-motion: reduce) {
-            html { scroll-behavior: auto; }
-            *, *::before, *::after { transition: none !important; }
-        }
-        button[aria-label*="fullscreen" i],
-        button[title*="fullscreen" i] {
-            display: none !important;
-        }
-        @media (max-width: 1100px) {
-            .vita-trust-strip { grid-template-columns: repeat(2, 1fr); margin-inline: .5rem; }
-            .vita-workflow { align-items: flex-start; flex-direction: column; }
-            .vita-workflow-arrow { display: none; }
-        }
-        @media (max-width: 700px) {
-            [data-testid="stAppViewContainer"] > .main .block-container { padding-inline: 1rem; }
-            .vita-trust-strip { grid-template-columns: 1fr 1fr; }
-            .vita-trust-item { padding: .75rem; }
-            .vita-card { padding: 1.15rem; border-radius: 18px; }
-        }
-        </style>
-        """,
+        f'<div class="hero"><div class="eyebrow">{APP_NAME} · prototype {APP_VERSION}</div>'
+        f"<h1>{title}</h1><p>{subtitle}</p></div>",
         unsafe_allow_html=True,
     )
-
-
-@st.cache_resource(show_spinner=False)
-def database() -> PredictionDatabase:
-    return PredictionDatabase()
-
-
-@st.cache_resource(show_spinner="Loading the CNN model…")
-def model_bundle():
-    if not MODEL_PATH.exists():
-        from download_model import install_model
-
-        install_model()
-    labels = load_class_names()
-    metadata = load_model_metadata()
-    model = load_trained_model()
-    output_classes = int(model.output_shape[-1])
-    if output_classes != len(labels):
-        raise ModelUnavailableError(
-            f"Model/label mismatch: model has {output_classes} outputs but labels contain {len(labels)} classes."
-        )
-    return model, labels, metadata
-
-
-def model_status() -> tuple[bool, str]:
-    try:
-        model_bundle()
-        return True, "CNN ready"
-    except ModelUnavailableError as exc:
-        return False, f"Model needs attention: {exc}"
-    except Exception:
-        LOGGER.exception("Unexpected model initialization failure")
-        return False, "Model needs attention. Check the server logs for details."
-
-
-def hero(kicker: str, heading: str, body: str, *, artwork: bool = False) -> None:
-    render_animated_hero(
-        kicker,
-        heading,
-        body,
-        artwork_path=HERO_ARTWORK_PATH if artwork else None,
-    )
-
-
-def section_heading(eyebrow: str, heading: str, body: str) -> None:
-    st.markdown(
-        f"""
-        <div class="vita-section-head">
-            <small>{eyebrow}</small>
-            <h2>{heading}</h2>
-            <p>{body}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def navigate_to(page: str) -> None:
-    st.session_state["page"] = page
-
-
-def sidebar() -> str:
-    brand_mark = "V"
-    if BRAND_ICON_PATH.exists():
-        encoded_icon = base64.b64encode(BRAND_ICON_PATH.read_bytes()).decode("ascii")
-        brand_mark = f'<img src="data:image/png;base64,{encoded_icon}" alt="Vita AI logo">'
-
-    st.sidebar.markdown(
-        f"""
-        <div class="vita-brand">
-            <div class="vita-brand-mark">{brand_mark}</div>
-            <div>
-                <div class="vita-brand-name">{APP_TITLE}</div>
-                <div class="vita-brand-sub">Explainable plant-health AI</div>
-            </div>
-        </div>
-        <div class="vita-sidebar-label">Workspace</div>
-        """,
-        unsafe_allow_html=True,
-    )
-    page = st.sidebar.radio(
-        "Navigate",
-        (
-            "Home",
-            "Screen a leaf",
-            "History & analytics",
-            "Model performance",
-            "Disease library",
-            "About & limitations",
-        ),
-        key="page",
-        label_visibility="collapsed",
-    )
-    st.sidebar.divider()
-    ready, message = model_status()
-    css_class = "model-ready" if ready else "model-missing"
-    st.sidebar.markdown(f'<div class="{css_class}">● {message}</div>', unsafe_allow_html=True)
-    st.sidebar.caption(f"App {APP_VERSION} · Images are not stored")
-    return page
 
 
 def render_home() -> None:
-    hero(
-        "Explainable plant intelligence",
-        APP_TITLE,
-        f"{APP_SUBTITLE}. Screen a leaf, inspect the model's evidence, and act with appropriate caution.",
-        artwork=True,
+    page_header(
+        "Plant-health screening that knows when to stop",
+        "Vita AI combines a private photo-quality check with transparent symptom matching. "
+        "It shows its evidence, avoids invented accuracy claims, and abstains when the case "
+        "is unclear.",
     )
     st.markdown(
-        """
-        <div class="vita-trust-strip" aria-label="System capabilities">
-            <div class="vita-trust-item"><span class="vita-trust-value">38</span><span class="vita-trust-label">AI-supported classes</span></div>
-            <div class="vita-trust-item"><span class="vita-trust-value">70</span><span class="vita-trust-label">Knowledge references</span></div>
-            <div class="vita-trust-item"><span class="vita-trust-value">Grad-CAM</span><span class="vita-trust-label">Visual explanation</span></div>
-            <div class="vita-trust-item"><span class="vita-trust-value">Private</span><span class="vita-trust-label">Images are not stored</span></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    action, learn = st.columns(2)
-    with action:
-        st.button(
-            "Start a leaf screening",
-            type="primary",
-            use_container_width=True,
-            on_click=navigate_to,
-            args=("Screen a leaf",),
-        )
-    with learn:
-        st.button(
-            "Explore disease library",
-            use_container_width=True,
-            on_click=navigate_to,
-            args=("Disease library",),
-        )
-
-    section_heading(
-        "How it works",
-        "A transparent three-step workflow",
-        "Every result begins with image-quality checks and ends with confidence-aware guidance.",
-    )
-    left, middle, right = st.columns(3)
-    with left:
-        st.markdown(
-            '<div class="vita-card"><span class="vita-step">01</span><h3>Capture clearly</h3><p>Upload or photograph one leaf. '
-            "Vita AI checks focus, lighting, contrast, dimensions, and visible detail before inference.</p></div>",
-            unsafe_allow_html=True,
-        )
-    with middle:
-        st.markdown(
-            '<div class="vita-card"><span class="vita-step">02</span><h3>Inspect the evidence</h3><p>Confirm the known plant, review the '
-            "condition candidates, reliability signals, and the regions that influenced the CNN.</p></div>",
-            unsafe_allow_html=True,
-        )
-    with right:
-        st.markdown(
-            '<div class="vita-card"><span class="vita-step">03</span><h3>Act responsibly</h3><p>Read conservative prevention guidance '
-            "and understand when professional confirmation is needed—without false certainty.</p></div>",
-            unsafe_allow_html=True,
-        )
-
-    section_heading(
-        "Capture guide",
-        "Give the model a useful image",
-        "A strong photograph reduces avoidable uncertainty before the screening begins.",
-    )
-    cols = st.columns(4)
-    tips = (
-        ("01 · Natural light", "Use bright, even light without glare."),
-        ("02 · One main leaf", "Keep the symptomatic leaf large in frame."),
-        ("03 · Sharp focus", "Focus on spots, lesions, or discoloration."),
-        ("04 · Calm background", "Reduce clutter behind the leaf."),
-    )
-    for column, (title, text) in zip(cols, tips, strict=True):
-        with column:
-            st.markdown(f"**{title}**  \n{text}")
-    st.write("")
-    st.markdown(
-        '<div class="vita-disclaimer">Vita AI predicts patterns learned from the PlantVillage classes. '
-        "Field images, uncommon crops, mixed diseases, pests, and nutrient deficiencies may produce unreliable results. "
-        "Always verify important decisions with a qualified agricultural professional.</div>",
+        '<div class="notice"><strong>Prototype boundary:</strong> Vita AI is decision support, '
+        "not a disease diagnosis. The match score is a rule match—not model confidence or "
+        "accuracy.</div>",
         unsafe_allow_html=True,
     )
 
+    conditions = load_conditions()
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Supported crops", len(crops()))
+    metric_cols[1].metric("Curated patterns", len(conditions))
+    metric_cols[2].metric("Images retained", "0")
+    metric_cols[3].metric("Unverified claims", "0")
 
-def render_quality(quality) -> None:
-    st.markdown("#### Photo-quality check")
-    cols = st.columns(4)
-    cols[0].metric("Technical photo score", f"{quality.score:.0f}/100")
-    cols[1].metric("Brightness", f"{quality.brightness:.0f}/255")
-    cols[2].metric("Contrast", f"{quality.contrast:.1f}")
-    cols[3].metric("Sharpness", f"{quality.sharpness:.0f}")
-    for warning in quality.warnings:
-        st.warning(warning)
-    if not quality.warnings:
-        st.success("The image passed the basic quality checks.")
-    st.caption(
-        "This score measures lighting, focus, resolution, contrast, and visible detail only. "
-        "It is not diagnostic accuracy or model confidence."
-    )
-
-
-def persist_prediction(result, quality, metadata) -> int:
-    alternatives = [f"{item.crop} — {item.condition}" for item in result.alternatives]
-    return database().save_prediction(
-        crop_name=result.selected_crop or result.primary.crop,
-        disease_name=result.primary.condition if result.reliable else "No reliable match",
-        health_status=result.primary.status if result.reliable else "Unknown",
-        confidence=result.primary.confidence if result.reliable else 0.0,
-        alternatives=alternatives,
-        image_quality_score=quality.score,
-        inference_time_ms=result.inference_time_ms,
-        model_version=metadata.model_version,
-    )
-
-
-def render_prediction_result(
-    result, quality, prediction_id: int, model, labels, metadata, image
-) -> None:
-    primary = result.primary
-    if result.reliable:
-        status_icon = "✓" if primary.status == "Healthy" else "!"
-        st.markdown(
-            f"""
-            <div class="vita-result">
-                <div class="crop">{result.selected_crop or primary.crop} · {primary.status}</div>
-                <div class="condition">{status_icon} {primary.condition}</div>
-                <div><strong>{primary.confidence:.1%} within-plant match</strong> · {result.confidence_level}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+    st.subheader("How a screening works")
+    columns = st.columns(3)
+    cards = [
+        (
+            "1 · Check the photo",
+            "The image is decoded safely and assessed for exposure, focus, resolution, and "
+            "visible leaf coverage.",
+        ),
+        (
+            "2 · Match evidence",
+            "Crop, visible symptoms, location on the plant, weather, and broad colour cues are "
+            "scored transparently.",
+        ),
+        (
+            "3 · Act cautiously",
+            "The app shows a shortlist and safe next steps—or explicitly returns no reliable "
+            "single match.",
+        ),
+    ]
+    for column, (title, body) in zip(columns, cards, strict=True):
+        column.markdown(
+            f'<div class="card"><h3>{title}</h3><p>{body}</p></div>', unsafe_allow_html=True
         )
-        st.info(result.guidance)
+
+    st.subheader("Designed for honest iteration")
+    st.write(
+        "Anonymous metadata and optional user feedback are stored locally in SQLite. That "
+        "creates a path to a future validated vision model without pretending this prototype "
+        "has field accuracy evidence."
+    )
+
+
+def photo_panel(uploaded_file):
+    if uploaded_file is None:
+        st.info("Upload one clear leaf photo. The file is processed in memory and is not saved.")
+        return None, None
+    try:
+        image = decode_image(uploaded_file)
+        assessment = assess_photo(image)
+    except ImageValidationError as exc:
+        st.error(str(exc))
+        return None, None
+
+    left, right = st.columns([1.25, 1])
+    left.image(image, caption="Local preview", use_container_width=True)
+    right.markdown(
+        "**Photo status:** "
+        f"<span class='status-{assessment.status}'>{assessment.status.title()}</span>",
+        unsafe_allow_html=True,
+    )
+    right.progress(assessment.quality_score, text=f"Capture quality {assessment.quality_score:.0%}")
+    c1, c2 = right.columns(2)
+    c1.metric("Resolution", f"{assessment.width} × {assessment.height}")
+    c2.metric("Leaf coverage", f"{assessment.leaf_coverage:.0%}")
+    if assessment.issues:
+        right.caption("Improve the photo")
+        for issue in assessment.issues:
+            right.write(f"• {issue}")
     else:
-        st.markdown(
-            f"""
-            <div class="vita-result">
-                <div class="crop">{result.selected_crop or primary.crop} · Result withheld</div>
-                <div class="condition">No reliable disease match</div>
-                <div>The model did not pass the plant-compatibility and disease-separation checks.</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.warning(result.guidance)
+        right.success("No major capture-quality issue detected.")
+    right.caption("Colour measurements are weak supporting cues and never diagnose a condition.")
+    return image, assessment
 
-    metrics = st.columns(4)
-    metrics[0].metric("Selected-plant support", f"{result.crop_support:.1%}")
-    metrics[1].metric("Within-plant match", f"{primary.confidence:.1%}")
-    metrics[2].metric("Photo quality", f"{quality.score:.0f}/100")
-    metrics[3].metric("Inference", f"{result.inference_time_ms:.0f} ms")
-    st.caption(
-        "These model scores are screening signals, not guaranteed probabilities of a correct diagnosis."
-    )
 
-    tab_details, tab_explain, tab_alternatives = st.tabs(
-        ("What this may mean", "Why the model looked here", "Top predictions")
-    )
-    with tab_details:
-        info = result.disease_info
-        if not result.reliable:
-            st.warning(
-                "Disease information and prevention guidance are withheld because this screening "
-                "did not produce a reliable match."
-            )
-        else:
-            st.markdown(f"**Overview**  \n{info.description}")
-            st.markdown(f"**Common visible symptoms**  \n{info.symptoms}")
-            st.markdown(f"**General prevention**  \n{info.prevention}")
-            st.warning(info.expert_warning)
-    with tab_explain:
-        if not result.reliable:
-            st.info("Explainability is withheld because no reliable disease match was produced.")
-        else:
-            try:
-                from src.gradcam import explain_prediction
+def render_result(result, case_id: str, payload: dict) -> None:
+    if result.status == "screened":
+        st.success(result.headline)
+    elif result.status in {"needs_review", "needs_better_photo"}:
+        st.warning(result.headline)
+    else:
+        st.info(result.headline)
+    st.write(result.explanation)
 
-                class_index = labels.index(primary.label)
-                overlay = explain_prediction(model, image, class_index, metadata)
-                c1, c2 = st.columns(2)
-                c1.image(image, caption="Original image", use_container_width=True)
-                c2.image(
-                    overlay,
-                    caption="Grad-CAM: warmer areas influenced this prediction more",
-                    use_container_width=True,
-                )
-                st.caption(
-                    "Grad-CAM is an explanation of model attention, not a segmentation of infected tissue."
-                )
-            except Exception:
-                LOGGER.exception("Grad-CAM generation failed")
-                st.info("Grad-CAM is unavailable for this model build.")
-    with tab_alternatives:
-        rows = [
+    if result.candidates:
+        st.subheader("Transparent shortlist")
+        table = [
             {
-                "Rank": rank,
-                "Crop": item.crop,
-                "Condition": item.condition,
-                "Within-plant score": f"{item.confidence:.1%}",
+                "Candidate": item.name,
+                "Type": item.category.title(),
+                "Rule match": f"{item.match_score:.0%}",
+                "Evidence matched": ", ".join(item.matched_evidence) or "Limited",
+                "Urgency": item.urgency.title(),
             }
-            for rank, item in enumerate((primary, *result.alternatives), start=1)
+            for item in result.candidates
         ]
-        st.dataframe(rows, hide_index=True, use_container_width=True)
-        st.caption(
-            "Candidate scores are normalized only across conditions supported for the selected plant. "
-            "They are not diagnostic accuracy."
-        )
+        st.dataframe(table, hide_index=True, use_container_width=True)
 
-    report = build_text_report(result, quality, metadata.model_version)
+        for index, candidate in enumerate(result.candidates, start=1):
+            with st.expander(f"{index}. {candidate.name} · {candidate.match_score:.0%} rule match"):
+                st.write(candidate.overview)
+                st.markdown("**Matched evidence**")
+                st.write(", ".join(candidate.matched_evidence) or "No strong symptom evidence")
+                st.markdown("**Useful checks that were not reported**")
+                st.write(", ".join(candidate.missing_evidence) or "None")
+                st.markdown("**Safe next steps**")
+                for step in candidate.next_steps:
+                    st.write(f"- {step}")
+                st.markdown("**Prevention**")
+                for step in candidate.prevention:
+                    st.write(f"- {step}")
+
+    report = build_report(case_id=case_id, result=result, **payload)
     st.download_button(
         "Download screening report",
-        data=report.encode("utf-8"),
-        file_name=f"vita-ai-screening-{prediction_id}.txt",
+        data=report,
+        file_name=f"vita-ai-{case_id[:8]}.txt",
         mime="text/plain",
         use_container_width=True,
     )
+
     st.markdown("#### Was this screening useful?")
     feedback_cols = st.columns(3)
-    choices = (
-        ("Correct", "Appears correct"),
-        ("Incorrect", "Appears incorrect"),
-        ("Unsure", "I’m unsure"),
-    )
-    for column, (value, label) in zip(feedback_cols, choices, strict=True):
-        if column.button(label, key=f"feedback-{prediction_id}-{value}", use_container_width=True):
-            database().update_feedback(prediction_id, value)
-            st.success("Anonymous feedback saved. Thank you.")
+    choices = [("Helpful", "helpful"), ("Incorrect", "incorrect"), ("Unsure", "unsure")]
+    for column, (label, verdict) in zip(feedback_cols, choices, strict=True):
+        if column.button(label, key=f"feedback-{case_id}-{verdict}", use_container_width=True):
+            save_feedback(case_id, verdict)
+            st.toast("Feedback saved locally. Thank you.")
 
 
 def render_screening() -> None:
-    hero(
-        "Guided screening",
-        "Screen a leaf",
-        "Choose the known plant, then add one clear leaf photo. Vita AI withholds results that do not pass its reliability checks.",
+    page_header(
+        "Start a new screening",
+        "Use one representative leaf, answer only what you can observe, and treat the result "
+        "as a shortlist.",
     )
-    st.markdown(
-        """
-        <div class="vita-workflow" aria-label="Screening workflow">
-            <span><strong>01</strong> Select the plant</span><span class="vita-workflow-arrow">→</span>
-            <span><strong>02</strong> Add a clear photo</span><span class="vita-workflow-arrow">→</span>
-            <span><strong>03</strong> Run constrained screening</span><span class="vita-workflow-arrow">→</span>
-            <span><strong>04</strong> Review or retry</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    uploaded_file = st.file_uploader(
+        "Leaf photo",
+        type=["jpg", "jpeg", "png", "webp"],
+        help="Maximum 8 MB. The image is processed in memory and is not stored.",
     )
-    section_heading(
-        "Image input",
-        "Identify the plant and choose a clear leaf photograph",
-        "The selected plant prevents the model from returning a disease belonging to another crop.",
-    )
-    supported_crops = sorted({get_disease_info(label).crop for label in load_class_names()})
-    selected_crop = st.selectbox(
-        "Which plant is shown?",
-        supported_crops,
-        index=None,
-        placeholder="Select the known plant",
-        help="Choose the plant you know is in the photo. Vita AI will screen only its supported conditions.",
-    )
-    source_mode = st.radio("Image source", ("Upload an image", "Use camera"), horizontal=True)
-    source = (
-        st.file_uploader("Choose a JPG, JPEG, or PNG image", type=("jpg", "jpeg", "png"))
-        if source_mode == "Upload an image"
-        else st.camera_input("Take a close, well-lit leaf photo")
-    )
-    if source is None:
-        st.markdown(
-            '<div class="vita-empty"><strong>Ready when you are</strong><br>Your image is processed in memory and is not stored in prediction history.</div>',
-            unsafe_allow_html=True,
+    _, photo = photo_panel(uploaded_file)
+
+    symptom_by_label = {label: key for key, label in SYMPTOMS.items()}
+    environment_by_label = {label: key for key, label in ENVIRONMENTS.items()}
+    distribution_by_label = {label: key for key, label in DISTRIBUTIONS.items()}
+
+    with st.form("screening-form"):
+        left, right = st.columns(2)
+        crop = left.selectbox("Known crop", crops())
+        selected_symptom_labels = left.multiselect(
+            "Visible symptoms",
+            list(symptom_by_label),
+            help="Select only visible evidence. Do not guess.",
         )
-        return
-    if selected_crop is None:
-        st.info("Select the plant before analyzing the leaf.")
-        return
-    try:
-        image = load_image(source)
-    except ImageValidationError as exc:
-        st.error(str(exc))
-        return
-    preview, assessment = st.columns((1, 1.1), gap="large")
-    with preview:
-        st.image(
-            image,
-            caption=f"Selected image · {image.width} × {image.height}",
-            use_container_width=True,
+        distribution_label = left.selectbox("Where symptoms appear", list(distribution_by_label))
+        selected_environment_labels = right.multiselect(
+            "Recent conditions",
+            list(environment_by_label),
         )
-    quality = assess_image_quality(image)
-    with assessment:
-        render_quality(quality)
-    if not quality.acceptable:
-        st.error("This image is not suitable for screening. Please capture a clearer replacement.")
-        return
-    analyze = st.button("Analyze leaf", type="primary", use_container_width=True)
-    if not analyze:
-        return
-    try:
-        model, labels, metadata = model_bundle()
-        with st.spinner("Analyzing visible patterns…"):
-            result = predict_image(model, image, labels, metadata, expected_crop=selected_crop)
-        prediction_id = persist_prediction(result, quality, metadata)
-        st.session_state["last_prediction_id"] = prediction_id
-        render_prediction_result(result, quality, prediction_id, model, labels, metadata, image)
-    except ModelUnavailableError as exc:
-        st.error(str(exc))
-        st.code("python download_model.py\nstreamlit run app.py", language="bash")
-    except Exception:
-        LOGGER.exception("Unexpected screening failure")
-        st.error("Analysis stopped safely. Please try another image or contact the app maintainer.")
+        notes = right.text_area(
+            "Optional notes",
+            max_chars=1000,
+            placeholder="When symptoms started, how quickly they spread, watering changes…",
+        )
+        consent = st.checkbox(
+            "I understand this is a screening prototype, not a diagnosis or treatment prescription."
+        )
+        submitted = st.form_submit_button(
+            "Screen this case", type="primary", use_container_width=True
+        )
+
+    if submitted:
+        if uploaded_file is None or photo is None:
+            st.error("Upload a valid leaf photo before screening.")
+            return
+        if not consent:
+            st.error("Please acknowledge the prototype boundary before continuing.")
+            return
+        symptom_keys = [symptom_by_label[item] for item in selected_symptom_labels]
+        environment_keys = [environment_by_label[item] for item in selected_environment_labels]
+        distribution = distribution_by_label[distribution_label]
+        result = screen_case(
+            crop=crop,
+            symptoms=symptom_keys,
+            environments=environment_keys,
+            distribution=distribution,
+            photo=photo,
+        )
+        payload = {
+            "crop": crop,
+            "symptoms": symptom_keys,
+            "environments": environment_keys,
+            "distribution": distribution,
+            "notes": notes,
+        }
+        case_id = save_screening(result=result, **payload)
+        st.session_state["latest_screening"] = (result, case_id, payload)
+
+    if "latest_screening" in st.session_state:
+        result, case_id, payload = st.session_state["latest_screening"]
+        st.divider()
+        render_result(result, case_id, payload)
 
 
 def render_history() -> None:
-    hero(
-        "Private by design",
-        "History & analytics",
-        "Only anonymous prediction metadata is stored. Uploaded leaf images are never written to the database.",
+    page_header(
+        "Local screening history",
+        "Only anonymous case metadata and optional feedback are retained. Uploaded images are "
+        "never saved.",
     )
-    data = database().analytics()
-    summary = data["summary"]
-    cols = st.columns(5)
-    cols[0].metric("Screenings", int(summary["total"] or 0))
-    cols[1].metric("Average confidence", f"{float(summary['average_confidence'] or 0):.1%}")
-    cols[2].metric("Healthy", int(summary["healthy"] or 0))
-    cols[3].metric("Diseased", int(summary["diseased"] or 0))
-    cols[4].metric("Low confidence", int(summary["low_confidence"] or 0))
-    if int(summary["total"] or 0) == 0:
-        st.markdown(
-            '<div class="vita-empty"><strong>No screening history yet</strong><br>Complete a leaf screening to build private, anonymous analytics on this device.</div>',
-            unsafe_allow_html=True,
-        )
-        st.button(
-            "Start the first screening",
-            type="primary",
-            on_click=navigate_to,
-            args=("Screen a leaf",),
-        )
+    rows = list_screenings()
+    if not rows:
+        st.info("No screenings have been saved on this device yet.")
         return
-    left, right = st.columns(2)
-    with left:
-        st.subheader("Screenings by crop")
-        st.bar_chart(data["by_crop"], x="crop_name", y="count", color="#3b735d")
-    with right:
-        st.subheader("Most frequent conditions")
-        st.bar_chart(data["top_conditions"], x="disease_name", y="count", color="#9aaa45")
-    st.subheader("Recent screenings")
-    rows = database().recent_predictions(200)
+    st.metric("Saved cases", len(rows))
+    display = []
     for row in rows:
-        row["confidence"] = f"{float(row['confidence']):.1%}"
-        row["image_quality_score"] = f"{float(row['image_quality_score']):.0f}/100"
-    visible = [
-        "created_at",
-        "crop_name",
-        "disease_name",
-        "health_status",
-        "confidence",
-        "image_quality_score",
-        "feedback",
-    ]
-    st.dataframe(
-        [{key: row[key] for key in visible} for row in rows],
-        hide_index=True,
-        use_container_width=True,
-    )
-    with st.expander("Privacy controls"):
-        st.warning("Clearing history permanently deletes all locally stored prediction metadata.")
-        confirm = st.checkbox("I understand that this cannot be undone.")
-        if st.button("Clear local prediction history", disabled=not confirm):
-            count = database().clear_history()
-            st.success(f"Deleted {count} local prediction record(s).")
-            st.rerun()
-
-
-def _load_json(path: Path):
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
-
-
-def render_performance() -> None:
-    hero(
-        "Evidence, not decoration",
-        "Model performance",
-        "This page displays metrics produced by evaluate.py. It never substitutes invented scores when evaluation artifacts are absent.",
-    )
-    metrics = _load_json(METRICS_PATH)
-    history = _load_json(HISTORY_PATH)
-    if metrics is None:
-        st.info(
-            "No verified evaluation artifacts are installed yet. Train or install a model, then run "
-            "`python evaluate.py --data <test-folder>`."
+        display.append(
+            {
+                "Created": row["created_at"].replace("T", " ")[:19] + " UTC",
+                "Crop": row["crop"],
+                "Outcome": row["status"].replace("_", " ").title(),
+                "Primary candidate": row["primary_condition"] or "None",
+                "Rule match": f"{row['match_score']:.0%}"
+                if row["match_score"] is not None
+                else "—",
+                "Photo": (row["photo_status"] or "—").title(),
+                "Feedback": (row["verdict"] or "—").title(),
+            }
         )
-        st.code(
-            "python train.py --data data/plantvillage --epochs 12\n"
-            "python evaluate.py --data data/plantvillage/test",
-            language="bash",
-        )
-        return
-    st.markdown(
-        '<div class="vita-disclaimer"><strong>Evaluation context:</strong> These results measure the controlled PlantVillage test split. They do not guarantee the same accuracy in farms, gardens, or mixed field conditions.</div>',
-        unsafe_allow_html=True,
-    )
-    st.write("")
-    cols = st.columns(5)
-    displayed = (
-        ("Test accuracy", "accuracy"),
-        ("Top-3 accuracy", "top_3_accuracy"),
-        ("Macro precision", "macro_precision"),
-        ("Macro recall", "macro_recall"),
-        ("Macro F1", "macro_f1"),
-    )
-    for column, (label, key) in zip(cols, displayed, strict=True):
-        value = metrics.get(key)
-        column.metric(label, "—" if value is None else f"{float(value):.2%}")
-    if history:
-        st.subheader("Training history")
-        keys = [key for key in ("accuracy", "val_accuracy", "loss", "val_loss") if key in history]
-        if keys:
-            st.line_chart({key: history[key] for key in keys})
-    if CONFUSION_MATRIX_PATH.exists():
-        st.subheader("Confusion matrix")
-        st.image(str(CONFUSION_MATRIX_PATH), use_container_width=True)
-    if CLASSIFICATION_REPORT_PATH.exists():
-        import pandas as pd
-
-        st.subheader("Per-class report")
-        st.dataframe(
-            pd.read_csv(CLASSIFICATION_REPORT_PATH), hide_index=True, use_container_width=True
-        )
-    st.caption(
-        "Dataset metrics may overestimate field reliability because PlantVillage images commonly use controlled backgrounds."
-    )
+    st.dataframe(display, hide_index=True, use_container_width=True)
+    with st.expander("Inspect latest stored metadata"):
+        latest = dict(rows[0])
+        latest["symptoms_json"] = json.loads(latest["symptoms_json"])
+        latest["environments_json"] = json.loads(latest["environments_json"])
+        latest.pop("result_json", None)
+        st.json(latest)
 
 
 def render_library() -> None:
-    labels = load_class_names()
-    items = library_conditions(labels)
-    ai_supported = [item for item in items if item.model_supported]
-    reference_only = [item for item in items if not item.model_supported]
-    hero(
-        "Curated plant-health knowledge",
-        "Disease library",
-        f"Explore {len(items)} crop and condition references. AI-supported entries match the installed "
-        "CNN; reference-only entries broaden education without overstating model capability.",
+    page_header(
+        "Plant-health knowledge library",
+        "Browse the curated patterns used by the transparent matching engine.",
     )
-
-    metrics = st.columns(4)
-    metrics[0].metric("Entries", len(items))
-    metrics[1].metric("AI classes", len(ai_supported))
-    metrics[2].metric("References", len(reference_only))
-    metrics[3].metric("Crops", len({item.crop for item in items}))
-    st.info(
-        "AI-supported means the installed model has a matching output class. Reference-only entries are "
-        "educational and cannot be selected as CNN predictions."
-    )
-
-    crops = sorted({item.crop for item in items})
-    categories = sorted({item.category for item in items})
-    search_col, crop_col, category_col = st.columns((1.5, 1, 1))
-    with search_col:
-        search = st.text_input(
-            "Search library", placeholder="Crop, condition, symptom, or category"
-        )
-    with crop_col:
-        selected_crop = st.selectbox("Crop", ("All crops", *crops))
-    with category_col:
-        selected_category = st.selectbox("Category", ("All categories", *categories))
-    support_filter = st.radio(
-        "Model coverage",
-        ("All entries", "AI-supported only", "Reference-only"),
-        horizontal=True,
-    )
-
-    query = search.casefold().strip()
-    filtered = [
-        item
-        for item in items
-        if (selected_crop == "All crops" or item.crop == selected_crop)
-        and (selected_category == "All categories" or item.category == selected_category)
-        and (support_filter != "AI-supported only" or item.model_supported)
-        and (support_filter != "Reference-only" or not item.model_supported)
-        and (
-            not query
-            or query
-            in f"{item.crop} {item.condition} {item.category} {item.description} {item.symptoms}".casefold()
-        )
+    crop_filter = st.selectbox("Crop", ("All", *crops()))
+    conditions = [
+        item for item in load_conditions() if crop_filter == "All" or item["crop"] == crop_filter
     ]
-    st.caption(f"Showing {len(filtered)} of {len(items)} library entries")
-    if not filtered:
-        st.warning("No entries match these filters. Clear the search or broaden the filters.")
-        return
-
-    for item in filtered:
-        coverage = "AI-supported" if item.model_supported else "Reference-only"
-        prefix = "●" if item.model_supported else "○"
-        with st.expander(f"{prefix} {item.crop} · {item.condition}"):
-            coverage_class = "vita-badge-ai" if item.model_supported else "vita-badge-reference"
-            st.markdown(
-                f'<span class="vita-badge {coverage_class}">{coverage}</span>'
-                f'<span class="vita-badge vita-badge-category">{item.category}</span>',
-                unsafe_allow_html=True,
-            )
-            st.write(item.description)
-            st.markdown(f"**Common visible symptoms**  \n{item.symptoms}")
-            st.markdown(f"**Conservative prevention guidance**  \n{item.prevention}")
-            if not item.model_supported:
-                st.caption(
-                    "Knowledge-base entry only — the current CNN cannot predict this condition. "
-                    "Use local diagnostic services for confirmation."
-                )
-
-    st.divider()
-    with st.expander("Library standards and authoritative references"):
-        st.markdown(
-            "Guidance follows integrated pest-management principles: prevention, clean planting material, "
-            "sanitation, resistant varieties, monitoring, and confirmation by qualified local professionals. "
-            "Recommendations deliberately exclude pesticide products and dosages."
-        )
-        st.markdown(
-            "- [FAO integrated pest-management principles]"
-            "(https://www.fao.org/pest-and-pesticide-management/ipm/principles-and-practices/en/)\n"
-            "- [American Phytopathological Society: plant disease diagnosis]"
-            "(https://www.apsnet.org/edcenter/Pages/PlantDiseaseDiagnosis.aspx)\n"
-            "- [USDA APHIS citrus disease guidance]"
-            "(https://www.aphis.usda.gov/plant-pests-diseases/citrus-diseases)"
-        )
+    for item in conditions:
+        with st.expander(f"{item['crop']} · {item['name']} · {item['category'].title()}"):
+            st.write(item["overview"])
+            st.markdown("**Typical observable evidence**")
+            st.write(", ".join(SYMPTOMS.get(key, key) for key in item["symptoms"]))
+            st.markdown("**Safe next steps**")
+            for step in item["next_steps"]:
+                st.write(f"- {step}")
 
 
 def render_about() -> None:
-    hero(
-        "Responsible AI",
-        "About & limitations",
-        "A transparent academic decision-support system designed to demonstrate a correct CNN workflow.",
+    page_header(
+        "About this prototype",
+        "A from-scratch Python implementation focused on truthful evidence and a safe path to "
+        "validation.",
     )
-    principles = st.columns(3)
-    principle_copy = (
-        (
-            "Confidence before certainty",
-            "The interface changes its guidance when confidence is low and never presents a screening as a confirmed diagnosis.",
-        ),
-        (
-            "Evidence before decoration",
-            "Performance figures come from evaluation artifacts, while Grad-CAM is labeled as model attention—not diseased tissue.",
-        ),
-        (
-            "Privacy by default",
-            "Uploaded images remain in memory. Only anonymous screening metadata and optional feedback are stored locally.",
-        ),
-    )
-    for column, (title, copy) in zip(principles, principle_copy, strict=True):
-        with column:
-            st.markdown(
-                f'<div class="vita-principle"><strong>{title}</strong><span>{copy}</span></div>',
-                unsafe_allow_html=True,
-            )
-
-    section_heading(
-        "System boundary",
-        "What Vita AI does—and what it cannot promise",
-        "A responsible interface makes the limits as easy to understand as the capabilities.",
-    )
-    left, right = st.columns(2, gap="large")
-    with left:
-        st.subheader("What the system does")
-        st.markdown(
-            """
-            - Converts genuine JPEG/PNG uploads to RGB.
-            - Preserves the 224 × 224 × 3 spatial tensor for CNN inference.
-            - Checks blur, exposure, dimensions, contrast, and visible detail.
-            - Returns top-three predictions with confidence-aware wording.
-            - Generates Grad-CAM for models trained by this project.
-            - Stores anonymous metadata and optional feedback in SQLite.
-            """
-        )
-    with right:
-        st.subheader("What it cannot guarantee")
-        st.markdown(
-            """
-            - It cannot confirm a laboratory diagnosis.
-            - It may fail on unsupported crops, mixed conditions, or non-leaf images.
-            - PlantVillage performance does not equal field performance.
-            - Visual symptoms may also reflect insects, nutrients, weather, or physical damage.
-            - It does not provide pesticide products, dosages, or regulatory advice.
-            """
-        )
-    st.subheader("Privacy")
+    st.subheader("What it does now")
     st.write(
-        "No account, name, phone number, email, or location is requested. Images are processed in memory "
-        "and not stored. History contains prediction metadata only and can be cleared locally."
+        "Vita AI validates a leaf photo, measures capture quality and broad colour cues, "
+        "combines those with structured symptom evidence, ranks curated condition patterns, "
+        "and stores anonymous local feedback."
     )
-    st.subheader("Model lineage")
+    st.subheader("What it deliberately does not claim")
     st.write(
-        "The included training pipeline uses MobileNetV2 transfer learning. A separately downloaded model "
-        "must retain its own source, license, label order, preprocessing mode, and evaluation evidence in "
-        "`models/model_metadata.json`."
+        "There is no trained disease classifier in this prototype and no stated field accuracy. "
+        "Rule-match percentages are transparent evidence scores, not probabilities. The app "
+        "never recommends pesticide products or doses."
+    )
+    st.subheader("Production path")
+    st.markdown(
+        "1. Collect consented, expert-labelled field images from target regions.\n"
+        "2. Split by farm, plant, and capture session to prevent leakage.\n"
+        "3. Train an out-of-distribution-aware vision model.\n"
+        "4. Calibrate probabilities on a locked field validation set.\n"
+        "5. Publish per-crop sensitivity, specificity, abstention rate, and known limitations."
     )
 
 
-def main() -> None:
-    ensure_runtime_directories()
-    inject_styles()
-    page = sidebar()
-    routes = {
-        "Home": render_home,
-        "Screen a leaf": render_screening,
-        "History & analytics": render_history,
-        "Model performance": render_performance,
-        "Disease library": render_library,
-        "About & limitations": render_about,
-    }
-    routes[page]()
+with st.sidebar:
+    st.markdown("## 🌿 Vita AI")
+    st.caption("Transparent plant-health screening")
+    page = st.radio("Navigate", ("Overview", "New screening", "History", "Knowledge", "About"))
+    st.divider()
+    st.caption("Photos stay in memory. Metadata stays on this device.")
 
-
-if __name__ == "__main__":
-    main()
+if page == "Overview":
+    render_home()
+elif page == "New screening":
+    render_screening()
+elif page == "History":
+    render_history()
+elif page == "Knowledge":
+    render_library()
+else:
+    render_about()

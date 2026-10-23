@@ -1,13 +1,9 @@
-.venv/
 __pycache__/
 *.py[cod]
-*.db
 .pytest_cache/
 .ruff_cache/
-.matplotlib/
+.venv/
+runtime/*.db
+runtime/*.db-*
 .streamlit/secrets.toml
-models/*.keras
-models/*.h5
-models/*.tflite
-data/
-*.log
+

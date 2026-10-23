@@ -1,286 +1,104 @@
-# ᕓ𐌉𐌕𐌀 𐌀𐌉
+# Vita AI
 
-**An Explainable CNN-Based Plant Disease Screening and Advisory System**
+Vita AI is a from-scratch Python prototype for transparent plant-health screening. It combines a
+private photo-quality check with a symptom-led decision-support engine, shows the evidence behind
+its shortlist, and explicitly abstains when the case is unclear.
 
-Vita AI is a privacy-conscious Streamlit application for educational plant-leaf screening. It validates an image, checks its visual quality, passes a `224 × 224 × 3` RGB tensor to a CNN, shows confidence-aware top-three predictions, generates a Grad-CAM explanation, provides conservative disease information, and stores anonymous prediction metadata in SQLite.
+It does **not** contain a trained plant-disease classifier and does **not** claim a field-accuracy
+percentage. A rule-match percentage is an interpretable evidence score, not a probability or a
+diagnosis.
 
-It is a decision-support demonstration—not a confirmed agricultural diagnosis.
+## What the prototype includes
 
-[Open the live app](https://vita-ai-plant-health.streamlit.app/) · [Report a bug](https://github.com/divya-aicodes/Vita-Ai/issues/new/choose)
+- Streamlit interface with Overview, New screening, History, Knowledge, and About pages
+- Safe JPEG, PNG, and WebP validation with an 8 MB upload limit
+- Local photo checks for resolution, brightness, contrast, focus, and visible leaf coverage
+- Transparent crop-specific symptom matching with conservative abstention
+- 25 curated condition patterns across 8 crops
+- Top-three shortlist with matched and missing evidence
+- Urgency-aware next steps and prevention guidance without pesticide products or doses
+- Anonymous SQLite history and optional feedback
+- Downloadable text report
+- Unit tests for screening, photo handling, the knowledge base, and persistence
+- GitHub Actions quality, test, and compilation pipeline
+- No image storage and no account requirement
 
-## Features
+## Supported crops
 
-- JPG, JPEG, and PNG upload plus camera capture
-- Genuine-image verification, EXIF orientation handling, and RGB conversion
-- Blur, brightness, contrast, dimensions, and visible-content checks
-- Required known-plant selection to prevent cross-crop disease results
-- Conservative reliability checks that withhold ambiguous or incompatible predictions
-- MobileNetV2 transfer-learning training pipeline
-- Optional custom CNN academic baseline
-- 70-entry disease library: 38 AI-supported PlantVillage classes plus 32 clearly marked reference-only conditions
-- High, moderate, and low-confidence response rules
-- Top-three predictions
-- Grad-CAM explanation for models trained by this repository
-- Disease overview, visible symptoms, and non-chemical prevention guidance
-- Anonymous SQLite history, analytics, and optional user feedback
-- Downloadable text screening report
-- Evaluation dashboard generated from real artifacts only
-- Responsive Streamlit interface
-- React Bits-inspired ShinyText headings and pointer-responsive BorderGlow hero panels
-- Krea-directed botanical diagnostic artwork and a professional mobile-first design system
-- Clear capability metrics, guided screening steps, responsible-AI principles, and direct task navigation
+Apple, Corn, Cucumber, Grape, Pepper, Potato, Strawberry, and Tomato.
 
-## Quick start on Windows
+## Run on Windows
 
-### Already prepared installation
-
-If the `.venv` folder and model are present, double-click:
-
-```text
-run_vita_ai.bat
-```
-
-### Fresh installation
-
-Install Python 3.12 from <https://www.python.org/downloads/> and enable **Add Python to PATH** during installation. Then double-click:
-
-```text
-setup_windows.bat
-```
-
-The setup creates an isolated environment, installs the requirements, and downloads the optional compatible model. When it finishes, run `run_vita_ai.bat`.
-
-### Command line
+Python 3.11 or newer is required.
 
 ```powershell
-cd "D:\Vita Ai"
+cd path\to\vita-ai
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe download_model.py
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-Streamlit prints the local URL, usually <http://localhost:8501>.
+You can also run `setup_windows.bat` once, followed by `run_windows.bat`.
 
-On Streamlit Community Cloud, the app automatically downloads the public MIT-licensed
-model from Hugging Face on first launch. The model file is intentionally excluded from
-Git because it is a generated runtime dependency. The installer verifies its pinned
-file size and SHA-256 checksum before activation, then performs an atomic replacement.
-
-## Accuracy and responsible use
-
-No image classifier is “perfectly accurate.” Accuracy depends on:
-
-- whether the crop and condition are among the 38 trained classes;
-- focus, lighting, scale, background, and camera quality;
-- the difference between controlled PlantVillage images and real field scenes;
-- early or mixed symptoms;
-- visually similar nutrient, insect, weather, and disease damage.
-
-The optional downloadable model’s model card reports 98.75% test accuracy on an augmented PlantVillage test set. That is a third-party, self-reported dataset result—not a promise of field accuracy. The app deliberately does not add that number to its performance dashboard. Use `evaluate.py` with an untouched local test set to produce locally verified evidence.
-
-This repository includes a local evaluation of that model on the official leaf-grouped PlantVillage colour test split: 10,709 images across 38 classes, with 99.18% accuracy, 99.95% top-three accuracy, and 98.83% macro F1. The generated metrics, class report, and confusion matrix are stored in `results/`. These controlled-dataset results still do not guarantee field performance.
-
-The screening workflow additionally asks the user to identify the known plant and ranks only conditions supported for that plant. A result is shown only when selected-plant support is at least 70%, the leading within-plant match is at least 95%, and its margin over the next candidate is at least 15 percentage points. On the same controlled test split, this policy accepted 97.89% of images and was correct on 99.98% of accepted images. It is an abstention policy—not a claim of 100% accuracy—and must be recalibrated on representative field images before production use.
-
-## Dataset layout
-
-Do not commit the dataset. A recommended layout is:
-
-```text
-data/
-└── plantvillage/
-    ├── train/
-    │   ├── Apple___Apple_scab/
-    │   ├── Apple___Black_rot/
-    │   └── ...
-    ├── valid/
-    │   ├── Apple___Apple_scab/
-    │   └── ...
-    └── test/
-        ├── Apple___Apple_scab/
-        └── ...
-```
-
-You may also provide one folder containing class folders. `train.py` then creates a deterministic training/validation split.
-
-## Train your own model
-
-```powershell
-.\.venv\Scripts\python.exe train.py `
-  --data data\plantvillage `
-  --model mobilenetv2 `
-  --epochs 12 `
-  --fine-tune-epochs 5
-```
-
-Training uses:
-
-- realistic flip, small rotation, zoom, and contrast augmentation;
-- ImageNet-pretrained MobileNetV2 by default;
-- a frozen feature-extraction phase;
-- optional fine-tuning of the top 55 backbone layers;
-- early stopping, best-model checkpointing, and learning-rate reduction;
-- sparse categorical cross-entropy, accuracy, and top-three accuracy.
-
-For a no-network architecture test:
-
-```powershell
-.\.venv\Scripts\python.exe train.py --data data\small-test --no-imagenet --epochs 1 --fine-tune-epochs 0
-```
-
-## Evaluate the model
-
-Keep the test folder untouched during training, then run:
-
-```powershell
-.\.venv\Scripts\python.exe evaluate.py --data data\plantvillage\test
-```
-
-This writes:
-
-- `results/metrics.json`
-- `results/training_history.json`
-- `results/classification_report.csv`
-- `results/confusion_matrix.png`
-
-The app reads those artifacts on the **Model performance** page.
-
-## Disease library scope
-
-The professional knowledge library deliberately separates model capability from educational coverage:
-
-- **AI-supported** entries map exactly to the installed CNN's 38 output classes.
-- **Reference-only** entries broaden crop-health education but are never presented as CNN predictions.
-- Search covers crops, conditions, categories, descriptions, and visible symptoms.
-- Crop, disease-category, and model-coverage filters make the 70 entries easier to browse.
-- Guidance follows conservative integrated pest-management principles and excludes pesticide products and dosages.
-
-Adding a reference entry does not change the CNN. New prediction classes require labeled training data,
-retraining, evaluation, and a matching update to `models/class_names.json`.
-
-## Run automated tests
-
-The core unit tests do not need TensorFlow or Streamlit:
-
-```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-```
-
-The tests cover genuine-image validation, RGB conversion, CNN tensor shape, quality checks, label parsing, confidence boundaries, top-three ranking, SQLite persistence and rollback, feedback, analytics, model-artifact hashing, and configuration consistency.
-
-Run all repository quality gates locally:
+## Run quality checks
 
 ```powershell
 .\.venv\Scripts\python.exe -m ruff check .
-.\.venv\Scripts\python.exe -m compileall -q app.py src tests download_model.py evaluate.py prepare_dataset.py train.py
+.\.venv\Scripts\python.exe -m ruff format --check .
+.\.venv\Scripts\python.exe -m compileall -q app.py src tests
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-GitHub Actions runs a staged pipeline for every pull request and every push to `main`: code
-quality, safety-focused unit tests, full production dependency checks, and an application/model
-contract check. Pull requests also receive a high-severity dependency review. See
-[`docs/WORKFLOW_PIPELINE.md`](docs/WORKFLOW_PIPELINE.md) for the problem statement, architecture,
-CI stages, and deployment flow.
+The unit tests do not require Streamlit. They require only NumPy and Pillow.
 
-## Project structure
+## Architecture
 
 ```text
-Vita Ai/
-├── app.py                       Streamlit application
-├── train.py                     MobileNetV2/custom-CNN training
-├── evaluate.py                  Real test-set evaluation artifacts
-├── download_model.py            Optional compatible model installer
-├── run_vita_ai.bat              One-click launcher
-├── setup_windows.bat            Fresh Windows setup
+vita-ai/
+├── app.py                              Streamlit user interface
+├── src/vita_ai/
+│   ├── config.py                       Limits and screening vocabulary
+│   ├── domain.py                       Typed result objects
+│   ├── image_quality.py                Secure decoding and photo assessment
+│   ├── knowledge.py                    Knowledge-base validation
+│   ├── screening.py                    Transparent ranking and abstention
+│   ├── storage.py                      SQLite case metadata and feedback
+│   ├── report.py                       Downloadable report generation
+│   └── data/conditions.json            Curated crop-condition rules
+├── tests/                              Automated tests
 ├── requirements.txt
-├── src/
-│   ├── config.py
-│   ├── database.py
-│   ├── disease_info.py
-│   ├── gradcam.py
-│   ├── model.py
-│   ├── prediction.py
-│   ├── preprocessing.py
-│   ├── quality_checker.py
-│   └── report.py
-├── database/
-│   └── schema.sql
-├── models/
-│   ├── class_names.json
-│   └── model_metadata.json
-├── results/
-├── assets/
-│   ├── vita-ai-logo.png          Primary square logo
-│   ├── vita-ai-icon.png          Browser/app icon
-│   ├── vita-ai-logo-transparent.png
-│   └── sample_images/
-└── tests/
+└── requirements-dev.txt
 ```
 
-## Privacy and security
+The image is decoded and assessed in memory. It is never inserted into SQLite. Only the selected
+crop, evidence, outcome, quality status, notes, and optional feedback are stored locally.
 
-- No login or personal information is requested.
-- Uploaded files are decoded as genuine JPEG/PNG images and capped at 10 MB.
-- Uploaded images are processed in memory and are not stored.
-- SQLite contains prediction metadata and optional feedback only.
-- Users can clear local history from the app.
-- The app does not expose local file paths to uploaders.
-- It gives no pesticide product or dosage recommendations.
-- The public model artifact is pinned to a verified SHA-256 digest.
-- SQLite uses foreign-key checks, a write-ahead log, busy timeouts, and transaction rollback.
+## How matching works
 
-Please report security vulnerabilities privately through [GitHub Security Advisories](https://github.com/divya-aicodes/Vita-Ai/security/advisories/new). See `SECURITY.md` for the disclosure policy and `CONTRIBUTING.md` for development standards.
+For the selected crop, each condition receives a bounded evidence score composed of:
 
-## Troubleshooting
+- 72% visible symptom agreement
+- 13% environment agreement
+- 10% location/distribution agreement
+- 5% broad photo observations
 
-### “TensorFlow is not installed”
+The photo contribution is deliberately weak because colour ratios are not disease-specific. A
+single condition is presented as the closest screening match only when it clears the minimum score,
+evidence-count, and lead-over-runner-up gates. Otherwise Vita AI returns `No reliable single match`.
 
-Run:
+These thresholds are product-safety defaults, not statistically calibrated thresholds.
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
+## Production roadmap
 
-### “No trained model was found”
+A production disease classifier should be added only after the following evidence exists:
 
-Run:
+1. Collect consented, expert-labelled field images for each intended crop and region.
+2. Split data by farm, plant, and capture session so related images cannot leak between splits.
+3. Train a model with explicit unknown/out-of-distribution handling.
+4. Calibrate outputs on a locked field validation set.
+5. Publish per-crop sensitivity, specificity, calibration error, abstention rate, and limitations.
+6. Run prospective field evaluation before treatment guidance or high-impact decisions.
 
-```powershell
-.\.venv\Scripts\python.exe download_model.py
-```
+Until then, this prototype is appropriate for interface testing, workflow validation, knowledge-base
+review, and gathering structured feedback—not autonomous agricultural diagnosis.
 
-or train a model with `train.py`.
-
-### Model and labels do not match
-
-The order and count in `models/class_names.json` must exactly match the model output layer. Never reorder labels after training.
-
-### Grad-CAM unavailable
-
-Grad-CAM is guaranteed for models created by this repository’s model builders. A third-party Keras model may use different internal layer names; prediction will still work, but the app will report explainability as unavailable instead of crashing.
-
-## References
-
-- TensorFlow MobileNetV2: <https://www.tensorflow.org/api_docs/python/tf/keras/applications/MobileNetV2>
-- TensorFlow transfer learning guide: <https://www.tensorflow.org/tutorials/images/transfer_learning>
-- Keras Grad-CAM example: <https://keras.io/examples/vision/grad_cam/>
-- Optional model: <https://huggingface.co/rarfileexe/Plant-Disease-Detector>
-
-## Animation integration
-
-The supplied React Bits `ShinyText` and `BorderGlow` behavior is integrated through
-`src/animations.py`. Because Streamlit is Python-based and does not expose its
-internal React tree, the component behavior is translated into isolated HTML,
-CSS, and JavaScript rather than adding an unnecessary second React build.
-The effects include:
-
-- a repeating directional shine across page headings;
-- pointer-sensitive edge proximity and cursor angle;
-- a multi-layer mesh-gradient border and outer glow;
-- an introductory border sweep;
-- responsive sizing and `prefers-reduced-motion` accessibility.
-
-## Visual design system
-
-Version 1.3.0 introduces a project-specific interface rather than a generic dashboard theme. The visual direction uses deep forest, mineral sage, warm ivory, and restrained chartreuse to communicate plant health, scientific care, and explainable AI. The home hero artwork was generated for Vita AI through Krea and optimized to a compact progressive JPEG for fast web delivery. The interface includes keyboard-visible focus states, responsive navigation, reduced-motion support, structured empty states, and confidence-first language.
