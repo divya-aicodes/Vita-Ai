@@ -4,13 +4,14 @@ Vita AI is a from-scratch Python prototype for transparent plant-health screenin
 private photo-quality check with a symptom-led decision-support engine, shows the evidence behind
 its shortlist, and explicitly abstains when the case is unclear.
 
-It does **not** contain a trained plant-disease classifier and does **not** claim a field-accuracy
-percentage. A rule-match percentage is an interpretable evidence score, not a probability or a
-diagnosis.
+It also includes a reproducible five-model transfer-learning and evaluation pipeline. Trained
+weights and performance numbers are deliberately not committed: they must be produced from a
+documented dataset and untouched test split. A rule-match percentage remains an interpretable
+evidence score, not a model probability or a diagnosis.
 
 ## What the prototype includes
 
-- Streamlit interface with Overview, New screening, History, Knowledge, and About pages
+- Streamlit interface with Overview, New screening, History, Knowledge, Model lab, and About pages
 - Safe JPEG, PNG, and WebP validation with an 8 MB upload limit
 - Local photo checks for resolution, brightness, contrast, focus, and visible leaf coverage
 - Transparent crop-specific symptom matching with conservative abstention
@@ -21,6 +22,9 @@ diagnosis.
 - Downloadable text report
 - Unit tests for screening, photo handling, the knowledge base, and persistence
 - GitHub Actions quality, test, and compilation pipeline
+- Comparable EfficientNetV2B0, ConvNeXtTiny, DenseNet121, MobileNetV3Large, and ResNet50V2 trainers
+- Test-set accuracy, balanced accuracy, macro/weighted F1, precision, recall, MCC, log loss,
+  confusion matrix, model size, and inference-time reporting
 - No image storage and no account requirement
 
 ## Supported crops
@@ -51,6 +55,43 @@ You can also run `setup_windows.bat` once, followed by `run_windows.bat`.
 
 The unit tests do not require Streamlit. They require only NumPy and Pillow.
 
+## Train and compare the five models
+
+Install the optional ML dependencies:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-ml.txt
+```
+
+Prepare one fixed dataset split. Every split must contain the same class directories:
+
+```text
+data/plant-disease/
+├── train/<class name>/*.{jpg,jpeg,png,webp}
+├── val/<class name>/*.{jpg,jpeg,png,webp}
+└── test/<class name>/*.{jpg,jpeg,png,webp}
+```
+
+Related photographs from the same plant, farm, or capture session must remain in one split. Do not
+select hyperparameters using `test`; it is reserved for the final comparison.
+
+Train all five approved models:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\train_models.py `
+  --data-dir data\plant-disease `
+  --epochs 12 `
+  --fine-tune-epochs 8
+```
+
+Generated weights, labels, per-class reports, confusion matrices, and `leaderboard.json` are written
+under `artifacts/ml/`, which is intentionally ignored by Git. The winner is selected first by test
+macro F1, then balanced accuracy, then inference time. The Streamlit **Model lab** page displays the
+leaderboard when these artifacts are present.
+
+The dataset determines the supported classes. A PlantVillage result is a controlled-dataset result;
+it must not be described as field-photo accuracy without a separate representative field test set.
+
 ## Architecture
 
 ```text
@@ -64,9 +105,12 @@ vita-ai/
 │   ├── screening.py                    Transparent ranking and abstention
 │   ├── storage.py                      SQLite case metadata and feedback
 │   ├── report.py                       Downloadable report generation
+│   ├── ml/                              Model registry, builders, and result reader
 │   └── data/conditions.json            Curated crop-condition rules
+├── scripts/train_models.py              Five-model training and locked-test evaluation
 ├── tests/                              Automated tests
 ├── requirements.txt
+├── requirements-ml.txt
 └── requirements-dev.txt
 ```
 
@@ -94,7 +138,7 @@ A production disease classifier should be added only after the following evidenc
 
 1. Collect consented, expert-labelled field images for each intended crop and region.
 2. Split data by farm, plant, and capture session so related images cannot leak between splits.
-3. Train a model with explicit unknown/out-of-distribution handling.
+3. Compare the five candidate models and add explicit unknown/out-of-distribution handling.
 4. Calibrate outputs on a locked field validation set.
 5. Publish per-crop sensitivity, specificity, calibration error, abstention rate, and limitations.
 6. Run prospective field evaluation before treatment guidance or high-impact decisions.

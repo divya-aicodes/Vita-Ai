@@ -18,10 +18,13 @@ from vita_ai.config import (  # noqa: E402
     APP_VERSION,
     DISTRIBUTIONS,
     ENVIRONMENTS,
+    ML_ARTIFACTS_DIR,
     SYMPTOMS,
 )
 from vita_ai.image_quality import ImageValidationError, assess_photo, decode_image  # noqa: E402
 from vita_ai.knowledge import crops, load_conditions  # noqa: E402
+from vita_ai.ml.registry import MODEL_SPECS  # noqa: E402
+from vita_ai.ml.results import load_leaderboard  # noqa: E402
 from vita_ai.report import build_report  # noqa: E402
 from vita_ai.screening import screen_case  # noqa: E402
 from vita_ai.storage import list_screenings, save_feedback, save_screening  # noqa: E402
@@ -341,6 +344,62 @@ def render_library() -> None:
                 st.write(f"- {step}")
 
 
+def render_model_lab() -> None:
+    page_header(
+        "Five-model evaluation lab",
+        "Train every candidate on the same data split, then select the winner using untouched "
+        "test-set macro F1, balanced accuracy, and measured inference time.",
+    )
+    st.dataframe(
+        [
+            {
+                "Model": spec.display_name,
+                "Input": f"{spec.image_size} × {spec.image_size}",
+                "Role": spec.purpose,
+            }
+            for spec in MODEL_SPECS
+        ],
+        hide_index=True,
+        use_container_width=True,
+    )
+
+    leaderboard_path = ML_ARTIFACTS_DIR / "leaderboard.json"
+    try:
+        leaderboard = load_leaderboard(leaderboard_path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        st.error(f"The generated leaderboard could not be read: {exc}")
+        return
+    if leaderboard is None:
+        st.info(
+            "No trained artifacts are installed yet. The repository contains the reproducible "
+            "training and evaluation pipeline, but it will not display invented performance."
+        )
+        st.code(
+            "python scripts/train_models.py --data-dir data/plant-disease",
+            language="powershell",
+        )
+        return
+
+    rows = []
+    for item in leaderboard["models"]:
+        rows.append(
+            {
+                "Model": item["model"],
+                "Accuracy": f"{item['accuracy']:.2%}",
+                "Macro F1": f"{item['macro_f1']:.2%}",
+                "Balanced accuracy": f"{item['balanced_accuracy']:.2%}",
+                "Latency": f"{item['inference_ms_per_image']:.1f} ms/image",
+                "Size": f"{item['model_size_mb']:.1f} MB",
+            }
+        )
+    st.success(f"Selected by test macro F1: {rows[0]['Model']}")
+    st.dataframe(rows, hide_index=True, use_container_width=True)
+    st.caption(
+        "These values describe only the configured held-out test set. They are not automatically "
+        "valid for field photographs, new regions, or unsupported crops."
+    )
+
+
 def render_about() -> None:
     page_header(
         "About this prototype",
@@ -355,9 +414,10 @@ def render_about() -> None:
     )
     st.subheader("What it deliberately does not claim")
     st.write(
-        "There is no trained disease classifier in this prototype and no stated field accuracy. "
-        "Rule-match percentages are transparent evidence scores, not probabilities. The app "
-        "never recommends pesticide products or doses."
+        "The repository includes a five-model training and comparison pipeline, but does not "
+        "claim a trained classifier is validated until real artifacts and held-out results are "
+        "present. Rule-match percentages remain transparent evidence scores, not probabilities. "
+        "The app never recommends pesticide products or doses."
     )
     st.subheader("Production path")
     st.markdown(
@@ -372,7 +432,9 @@ def render_about() -> None:
 with st.sidebar:
     st.markdown("## 🌿 Vita AI")
     st.caption("Transparent plant-health screening")
-    page = st.radio("Navigate", ("Overview", "New screening", "History", "Knowledge", "About"))
+    page = st.radio(
+        "Navigate", ("Overview", "New screening", "History", "Knowledge", "Model lab", "About")
+    )
     st.divider()
     st.caption("Photos stay in memory. Metadata stays on this device.")
 
@@ -384,5 +446,7 @@ elif page == "History":
     render_history()
 elif page == "Knowledge":
     render_library()
+elif page == "Model lab":
+    render_model_lab()
 else:
     render_about()

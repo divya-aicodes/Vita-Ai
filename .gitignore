@@ -6,4 +6,6 @@ __pycache__/
 runtime/*.db
 runtime/*.db-*
 .streamlit/secrets.toml
+artifacts/ml/
+data/
 

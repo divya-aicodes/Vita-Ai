@@ -7,6 +7,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_DIR = PROJECT_ROOT / "runtime"
 DATABASE_PATH = RUNTIME_DIR / "vita_ai.db"
+ML_ARTIFACTS_DIR = PROJECT_ROOT / "artifacts" / "ml"
 
 APP_NAME = "Vita AI"
 APP_VERSION = "0.1.0"
