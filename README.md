@@ -3,23 +3,23 @@
 [![Vita AI CI](https://github.com/divya-aicodes/Vita-Ai/actions/workflows/ci.yml/badge.svg)](https://github.com/divya-aicodes/Vita-Ai/actions)
 [![PlantVillage models](https://img.shields.io/badge/models-PlantVillage%20v1-286444)](https://github.com/divya-aicodes/Vita-Ai/releases/tag/plantvillage-v1)
 
-Vita AI is a from-scratch Python prototype for transparent plant-health screening. It combines a
-private photo-quality check with a symptom-led decision-support engine, shows the evidence behind
-its shortlist, and explicitly abstains when the case is unclear.
+Vita AI is a from-scratch Python prototype for image-based plant-health screening. It combines a
+private photo-quality check with five selectable PlantVillage classifiers, shows the model's
+top-three image classes, and explicitly flags low-confidence results.
 
 It also includes five working PlantVillage transfer-learning classifiers. The Streamlit app can
 download any selected, versioned ONNX model from GitHub Releases, verify its checksum, cache it,
-and return the top three of 38 classes. A rule-match percentage remains a separate interpretable
-evidence score, not a model probability or a diagnosis.
+and return the top three of 38 classes. The result remains decision support, not a diagnosis or
+treatment recommendation.
 
 ## What the prototype includes
 
 - Streamlit interface with Overview, New screening, History, Knowledge, Model lab, and About pages
 - Safe JPEG, PNG, and WebP validation with an 8 MB upload limit
 - Local photo checks for resolution, brightness, contrast, focus, and visible leaf coverage
-- Transparent crop-specific symptom matching with conservative abstention
-- 25 curated condition patterns across 8 crops
-- Top-three shortlist with matched and missing evidence
+- One-click ML screening after the selected model recognizes the crop and condition
+- 25 curated guidance patterns across 8 crops for enriching supported ML results
+- Top-three ML shortlist with confidence and explicit limitations
 - Urgency-aware next steps and prevention guidance without pesticide products or doses
 - Anonymous SQLite history and optional feedback
 - Downloadable text report
@@ -33,8 +33,8 @@ evidence score, not a model probability or a diagnosis.
 
 ## Supported crops
 
-The transparent symptom-matching workflow covers 8 crops: Apple, Corn, Cucumber, Grape, Pepper,
-Potato, Strawberry, and Tomato.
+Curated follow-up guidance is available for 8 crops: Apple, Corn, Cucumber, Grape, Pepper, Potato,
+Strawberry, and Tomato. Users do not need to select a crop manually; the model supplies it.
 
 The ML classifiers cover all 14 crop categories in the 38-class PlantVillage color dataset: Apple,
 Blueberry, Cherry, Corn, Grape, Orange, Peach, Pepper, Potato, Raspberry, Soybean, Squash,
@@ -188,20 +188,17 @@ vita-ai/
 The image is decoded and assessed in memory. It is never inserted into SQLite. Only the selected
 crop, evidence, outcome, quality status, notes, and optional feedback are stored locally.
 
-## How matching works
+## How ML screening works
 
-For the selected crop, each condition receives a bounded evidence score composed of:
+1. The uploaded image is decoded safely and checked for basic capture quality.
+2. The user selects and runs one of the five ONNX classifiers.
+3. The model supplies the crop, condition, confidence, and top-three alternatives.
+4. **Screen this case** records that ML result and presents cautious follow-up guidance.
 
-- 72% visible symptom agreement
-- 13% environment agreement
-- 10% location/distribution agreement
-- 5% broad photo observations
-
-The photo contribution is deliberately weak because colour ratios are not disease-specific. A
-single condition is presented as the closest screening match only when it clears the minimum score,
-evidence-count, and lead-over-runner-up gates. Otherwise Vita AI returns `No reliable single match`.
-
-These thresholds are product-safety defaults, not statistically calibrated thresholds.
+No crop, symptom, weather, or symptom-location questionnaire is required. When the top class maps
+to the curated knowledge library, Vita AI adds crop-specific checks and prevention guidance;
+otherwise it provides conservative general next steps. Confidence below 65% is explicitly marked
+for review. Softmax confidence is not a field-accuracy guarantee or a calibrated diagnosis.
 
 ## Production roadmap
 

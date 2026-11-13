@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -16,8 +17,6 @@ if str(SRC_DIR) not in sys.path:
 from vita_ai.config import (  # noqa: E402
     APP_NAME,
     APP_VERSION,
-    DISTRIBUTIONS,
-    ENVIRONMENTS,
     ML_LEADERBOARD_PATH,
     ML_MODEL_CACHE_DIR,
     ML_RELEASE_MANIFEST_PATH,
@@ -32,8 +31,8 @@ from vita_ai.ml.inference import (  # noqa: E402
 )
 from vita_ai.ml.registry import MODEL_SPECS  # noqa: E402
 from vita_ai.ml.results import load_leaderboard  # noqa: E402
+from vita_ai.ml.screening import build_ml_screening  # noqa: E402
 from vita_ai.report import build_report  # noqa: E402
-from vita_ai.screening import screen_case  # noqa: E402
 from vita_ai.storage import list_screenings, save_feedback, save_screening  # noqa: E402
 
 st.set_page_config(
@@ -85,21 +84,18 @@ def page_header(title: str, subtitle: str) -> None:
 def render_home() -> None:
     page_header(
         "Plant-health screening that knows when to stop",
-        "Vita AI combines a private photo-quality check with transparent symptom matching. "
-        "It shows its evidence, avoids invented accuracy claims, and abstains when the case "
-        "is unclear.",
+        "Vita AI checks photo quality, runs a selected PlantVillage image classifier, shows "
+        "its top predictions, and keeps controlled-dataset results separate from field claims.",
     )
     st.markdown(
         '<div class="notice"><strong>Prototype boundary:</strong> Vita AI is decision support, '
-        "not a disease diagnosis. The match score is a rule match—not model confidence or "
-        "accuracy.</div>",
+        "not a disease diagnosis. Model confidence is not a field-accuracy guarantee.</div>",
         unsafe_allow_html=True,
     )
 
-    conditions = load_conditions()
     metric_cols = st.columns(4)
-    metric_cols[0].metric("Supported crops", len(crops()))
-    metric_cols[1].metric("Curated patterns", len(conditions))
+    metric_cols[0].metric("ML classes", 38)
+    metric_cols[1].metric("Available models", len(MODEL_SPECS))
     metric_cols[2].metric("Images retained", "0")
     metric_cols[3].metric("Unverified claims", "0")
 
@@ -112,14 +108,13 @@ def render_home() -> None:
             "visible leaf coverage.",
         ),
         (
-            "2 · Match evidence",
-            "Crop, visible symptoms, location on the plant, weather, and broad colour cues are "
-            "scored transparently.",
+            "2 · Run one model",
+            "Choose any of the five trained classifiers and review its top-three image classes.",
         ),
         (
-            "3 · Act cautiously",
-            "The app shows a shortlist and safe next steps—or explicitly returns no reliable "
-            "single match.",
+            "3 · Screen the case",
+            "Confirm the ML result with one click, then review cautious next steps and "
+            "limitations.",
         ),
     ]
     for column, (title, body) in zip(columns, cards, strict=True):
@@ -130,8 +125,8 @@ def render_home() -> None:
     st.subheader("Designed for honest iteration")
     st.write(
         "Anonymous metadata and optional user feedback are stored locally in SQLite. That "
-        "creates a path to a future validated vision model without pretending this prototype "
-        "has field accuracy evidence."
+        "supports careful model review without retaining uploaded images or pretending the "
+        "controlled-dataset metrics prove field accuracy."
     )
 
 
@@ -167,7 +162,7 @@ def photo_panel(uploaded_file):
     return image, assessment
 
 
-def render_ml_prediction(image) -> None:
+def render_ml_prediction(image, photo, upload_signature: str) -> None:
     try:
         trained_keys = available_models(ML_MODEL_CACHE_DIR, ML_RELEASE_MANIFEST_PATH)
     except (ModelUnavailableError, OSError, json.JSONDecodeError) as exc:
@@ -176,7 +171,7 @@ def render_ml_prediction(image) -> None:
     if not trained_keys:
         return
     specifications = {item.key: item for item in MODEL_SPECS}
-    st.subheader("ML disease classification")
+    st.subheader("Quick ML scan")
     st.caption(
         "Select any independently trained model. Predictions cover the 38 controlled "
         "PlantVillage classes and do not establish field-photo accuracy. The selected model "
@@ -200,33 +195,64 @@ def render_ml_prediction(image) -> None:
         except (ModelUnavailableError, OSError, ValueError, json.JSONDecodeError) as exc:
             st.error(f"The selected model could not run: {exc}")
             return
-        primary = predictions[0]
-        if primary.confidence >= 0.65:
-            st.success(
-                f"{primary.crop} · {primary.condition} · {primary.confidence:.1%} confidence"
-            )
-        else:
-            st.warning(
-                f"Low-confidence result: {primary.crop} · {primary.condition} · "
-                f"{primary.confidence:.1%}. Treat this as uncertain."
-            )
-        st.dataframe(
-            [
-                {
-                    "Rank": index,
-                    "Crop": item.crop,
-                    "Condition": item.condition,
-                    "Model confidence": f"{item.confidence:.2%}",
-                }
-                for index, item in enumerate(predictions, start=1)
-            ],
-            hide_index=True,
-            use_container_width=True,
+        st.session_state["ml_prediction"] = {
+            "upload_signature": upload_signature,
+            "model_key": selected_key,
+            "predictions": predictions,
+        }
+
+    prediction_state = st.session_state.get("ml_prediction")
+    if not prediction_state or prediction_state["upload_signature"] != upload_signature:
+        return
+    if prediction_state["model_key"] != selected_key:
+        st.info("Run the newly selected model to replace the current result.")
+        return
+
+    predictions = prediction_state["predictions"]
+    primary = predictions[0]
+    if primary.confidence >= 0.65:
+        st.success(f"{primary.crop} · {primary.condition} · {primary.confidence:.1%} confidence")
+    else:
+        st.warning(
+            f"Low-confidence result: {primary.crop} · {primary.condition} · "
+            f"{primary.confidence:.1%}. Treat this as uncertain."
         )
+    st.dataframe(
+        [
+            {
+                "Rank": index,
+                "Crop": item.crop,
+                "Condition": item.condition,
+                "Model confidence": f"{item.confidence:.2%}",
+            }
+            for index, item in enumerate(predictions, start=1)
+        ],
+        hide_index=True,
+        use_container_width=True,
+    )
+    st.caption(
+        "The model has supplied the crop and condition. No symptom, weather, or location form "
+        "is required."
+    )
+    if st.button("Screen this case", type="primary", use_container_width=True):
+        model_name = specifications[selected_key].display_name
+        result = build_ml_screening(predictions, photo=photo, model_name=model_name)
+        payload = {
+            "crop": primary.crop,
+            "symptoms": [],
+            "environments": [],
+            "distribution": "image_only",
+            "notes": f"ML model: {model_name}",
+        }
+        case_id = save_screening(result=result, **payload)
+        st.session_state["latest_screening"] = (result, case_id, payload)
+        st.toast("ML screening saved locally.")
 
 
 def render_result(result, case_id: str, payload: dict) -> None:
-    if result.status == "screened":
+    is_ml = result.method == "ml"
+    score_label = "Model confidence" if is_ml else "Rule match"
+    if result.status in {"screened", "ml_screened"}:
         st.success(result.headline)
     elif result.status in {"needs_review", "needs_better_photo"}:
         st.warning(result.headline)
@@ -235,13 +261,13 @@ def render_result(result, case_id: str, payload: dict) -> None:
     st.write(result.explanation)
 
     if result.candidates:
-        st.subheader("Transparent shortlist")
+        st.subheader("ML prediction shortlist" if is_ml else "Transparent shortlist")
         table = [
             {
                 "Candidate": item.name,
                 "Type": item.category.title(),
-                "Rule match": f"{item.match_score:.0%}",
-                "Evidence matched": ", ".join(item.matched_evidence) or "Limited",
+                score_label: f"{item.match_score:.0%}",
+                "Basis": ", ".join(item.matched_evidence) or "Limited",
                 "Urgency": item.urgency.title(),
             }
             for item in result.candidates
@@ -249,9 +275,12 @@ def render_result(result, case_id: str, payload: dict) -> None:
         st.dataframe(table, hide_index=True, use_container_width=True)
 
         for index, candidate in enumerate(result.candidates, start=1):
-            with st.expander(f"{index}. {candidate.name} · {candidate.match_score:.0%} rule match"):
+            with st.expander(
+                f"{index}. {candidate.name} · {candidate.match_score:.0%} "
+                + ("model confidence" if is_ml else "rule match")
+            ):
                 st.write(candidate.overview)
-                st.markdown("**Matched evidence**")
+                st.markdown("**Model basis**" if is_ml else "**Matched evidence**")
                 st.write(", ".join(candidate.matched_evidence) or "No strong symptom evidence")
                 st.markdown("**Useful checks that were not reported**")
                 st.write(", ".join(candidate.missing_evidence) or "None")
@@ -283,73 +312,25 @@ def render_result(result, case_id: str, payload: dict) -> None:
 def render_screening() -> None:
     page_header(
         "Start a new screening",
-        "Use one representative leaf, answer only what you can observe, and treat the result "
-        "as a shortlist.",
+        "Upload one representative leaf, run a selected ML model, then screen the recognized "
+        "result with one click.",
     )
     uploaded_file = st.file_uploader(
         "Leaf photo",
         type=["jpg", "jpeg", "png", "webp"],
         help="Maximum 8 MB. The image is processed in memory and is not stored.",
     )
+    upload_signature = (
+        hashlib.sha256(uploaded_file.getvalue()).hexdigest() if uploaded_file is not None else None
+    )
+    if st.session_state.get("ml_upload_signature") != upload_signature:
+        st.session_state["ml_upload_signature"] = upload_signature
+        st.session_state.pop("ml_prediction", None)
+        st.session_state.pop("latest_screening", None)
+
     image, photo = photo_panel(uploaded_file)
     if image is not None:
-        render_ml_prediction(image)
-
-    symptom_by_label = {label: key for key, label in SYMPTOMS.items()}
-    environment_by_label = {label: key for key, label in ENVIRONMENTS.items()}
-    distribution_by_label = {label: key for key, label in DISTRIBUTIONS.items()}
-
-    with st.form("screening-form"):
-        left, right = st.columns(2)
-        crop = left.selectbox("Known crop", crops())
-        selected_symptom_labels = left.multiselect(
-            "Visible symptoms",
-            list(symptom_by_label),
-            help="Select only visible evidence. Do not guess.",
-        )
-        distribution_label = left.selectbox("Where symptoms appear", list(distribution_by_label))
-        selected_environment_labels = right.multiselect(
-            "Recent conditions",
-            list(environment_by_label),
-        )
-        notes = right.text_area(
-            "Optional notes",
-            max_chars=1000,
-            placeholder="When symptoms started, how quickly they spread, watering changes…",
-        )
-        consent = st.checkbox(
-            "I understand this is a screening prototype, not a diagnosis or treatment prescription."
-        )
-        submitted = st.form_submit_button(
-            "Screen this case", type="primary", use_container_width=True
-        )
-
-    if submitted:
-        if uploaded_file is None or photo is None:
-            st.error("Upload a valid leaf photo before screening.")
-            return
-        if not consent:
-            st.error("Please acknowledge the prototype boundary before continuing.")
-            return
-        symptom_keys = [symptom_by_label[item] for item in selected_symptom_labels]
-        environment_keys = [environment_by_label[item] for item in selected_environment_labels]
-        distribution = distribution_by_label[distribution_label]
-        result = screen_case(
-            crop=crop,
-            symptoms=symptom_keys,
-            environments=environment_keys,
-            distribution=distribution,
-            photo=photo,
-        )
-        payload = {
-            "crop": crop,
-            "symptoms": symptom_keys,
-            "environments": environment_keys,
-            "distribution": distribution,
-            "notes": notes,
-        }
-        case_id = save_screening(result=result, **payload)
-        st.session_state["latest_screening"] = (result, case_id, payload)
+        render_ml_prediction(image, photo, upload_signature)
 
     if "latest_screening" in st.session_state:
         result, case_id, payload = st.session_state["latest_screening"]
@@ -376,9 +357,7 @@ def render_history() -> None:
                 "Crop": row["crop"],
                 "Outcome": row["status"].replace("_", " ").title(),
                 "Primary candidate": row["primary_condition"] or "None",
-                "Rule match": f"{row['match_score']:.0%}"
-                if row["match_score"] is not None
-                else "—",
+                "Score": f"{row['match_score']:.0%}" if row["match_score"] is not None else "—",
                 "Photo": (row["photo_status"] or "—").title(),
                 "Feedback": (row["verdict"] or "—").title(),
             }
@@ -475,15 +454,15 @@ def render_about() -> None:
     )
     st.subheader("What it does now")
     st.write(
-        "Vita AI validates a leaf photo, measures capture quality and broad colour cues, "
-        "combines those with structured symptom evidence, ranks curated condition patterns, "
-        "and stores anonymous local feedback."
+        "Vita AI validates a leaf photo, measures capture quality, runs any of five trained "
+        "PlantVillage classifiers, shows the top-three image classes, and stores anonymous "
+        "screening metadata and optional feedback."
     )
     st.subheader("What it deliberately does not claim")
     st.write(
         "The five classifiers have controlled PlantVillage test results, not demonstrated "
-        "field-photo accuracy. Rule-match percentages remain transparent evidence scores, not "
-        "probabilities. The app never recommends pesticide products or doses."
+        "field-photo accuracy. Model confidence is not a diagnosis or treatment recommendation. "
+        "The app never recommends pesticide products or doses."
     )
     st.subheader("Production path")
     st.markdown(

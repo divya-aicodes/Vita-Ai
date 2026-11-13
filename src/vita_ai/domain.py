@@ -52,6 +52,7 @@ class ScreeningResult:
     candidates: tuple[Candidate, ...] = field(default_factory=tuple)
     photo: PhotoAssessment | None = None
     evidence_count: int = 0
+    method: str = "rule"
 
     @property
     def primary(self) -> Candidate | None:
@@ -65,4 +66,5 @@ class ScreeningResult:
             "candidates": [item.as_dict() for item in self.candidates],
             "photo": self.photo.as_dict() if self.photo else None,
             "evidence_count": self.evidence_count,
+            "method": self.method,
         }

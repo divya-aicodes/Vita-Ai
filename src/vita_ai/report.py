@@ -18,6 +18,7 @@ def build_report(
     notes: str,
     result: ScreeningResult,
 ) -> str:
+    is_ml = result.method == "ml"
     lines = [
         "VITA AI — PLANT HEALTH SCREENING REPORT",
         "=" * 45,
@@ -26,17 +27,32 @@ def build_report(
         f"Crop: {crop}",
         f"Outcome: {result.headline}",
         "",
-        "Important: This prototype produces transparent symptom matches, not a diagnosis or a "
-        "calibrated disease probability.",
+        (
+            "Important: This ML result is a controlled PlantVillage image classification, not "
+            "a field diagnosis or calibrated treatment recommendation."
+            if is_ml
+            else "Important: This prototype produces transparent symptom matches, not a "
+            "diagnosis or a calibrated disease probability."
+        ),
         "",
         "Evidence",
         "--------",
-        "Symptoms: " + ", ".join(SYMPTOMS.get(item, item) for item in symptoms),
-        "Environment: "
-        + (", ".join(ENVIRONMENTS.get(item, item) for item in environments) or "Not provided"),
-        f"Distribution: {DISTRIBUTIONS.get(distribution, distribution)}",
         f"Photo quality: {result.photo.status if result.photo else 'Not assessed'}",
     ]
+    if is_ml:
+        lines.append("Input evidence: leaf image only; no symptom questionnaire was used")
+    else:
+        lines.extend(
+            [
+                "Symptoms: " + ", ".join(SYMPTOMS.get(item, item) for item in symptoms),
+                "Environment: "
+                + (
+                    ", ".join(ENVIRONMENTS.get(item, item) for item in environments)
+                    or "Not provided"
+                ),
+                f"Distribution: {DISTRIBUTIONS.get(distribution, distribution)}",
+            ]
+        )
     if notes.strip():
         lines.append(f"Notes: {notes.strip()}")
 
@@ -44,7 +60,8 @@ def build_report(
     for index, candidate in enumerate(result.candidates, start=1):
         lines.extend(
             [
-                f"{index}. {candidate.name} — {candidate.match_score:.0%} rule match",
+                f"{index}. {candidate.name} — {candidate.match_score:.0%} "
+                + ("model confidence" if is_ml else "rule match"),
                 f"   Matched: {', '.join(candidate.matched_evidence) or 'No strong symptom match'}",
                 f"   About: {candidate.overview}",
             ]
