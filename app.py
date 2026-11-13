@@ -22,6 +22,7 @@ from vita_ai.config import (  # noqa: E402
     ML_RELEASE_MANIFEST_PATH,
     SYMPTOMS,
 )
+from vita_ai.docx_report import build_docx_report  # noqa: E402
 from vita_ai.image_quality import ImageValidationError, assess_photo, decode_image  # noqa: E402
 from vita_ai.knowledge import crops, load_conditions  # noqa: E402
 from vita_ai.ml.inference import (  # noqa: E402
@@ -32,7 +33,6 @@ from vita_ai.ml.inference import (  # noqa: E402
 from vita_ai.ml.registry import MODEL_SPECS  # noqa: E402
 from vita_ai.ml.results import load_leaderboard  # noqa: E402
 from vita_ai.ml.screening import build_ml_screening  # noqa: E402
-from vita_ai.report import build_report  # noqa: E402
 from vita_ai.storage import list_screenings, save_feedback, save_screening  # noqa: E402
 
 st.set_page_config(
@@ -291,12 +291,12 @@ def render_result(result, case_id: str, payload: dict) -> None:
                 for step in candidate.prevention:
                     st.write(f"- {step}")
 
-    report = build_report(case_id=case_id, result=result, **payload)
+    report = build_docx_report(case_id=case_id, result=result, **payload)
     st.download_button(
-        "Download screening report",
+        "Download Word screening report",
         data=report,
-        file_name=f"vita-ai-{case_id[:8]}.txt",
-        mime="text/plain",
+        file_name=f"vita-ai-{case_id[:8]}.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         use_container_width=True,
     )
 

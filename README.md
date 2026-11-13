@@ -22,7 +22,7 @@ treatment recommendation.
 - Top-three ML shortlist with confidence and explicit limitations
 - Urgency-aware next steps and prevention guidance without pesticide products or doses
 - Anonymous SQLite history and optional feedback
-- Downloadable text report
+- Downloadable, editable Word (`.docx`) screening report
 - Unit tests for screening, photo handling, the knowledge base, and persistence
 - GitHub Actions quality, test, and compilation pipeline
 - Comparable EfficientNetV2B0, ConvNeXtTiny, DenseNet121, MobileNetV3Large, and ResNet50V2 trainers
@@ -58,7 +58,7 @@ You can also run `setup_windows.bat` once, followed by `run_windows.bat`.
 1. Open **New screening** and upload a JPEG, PNG, or WebP leaf image.
 2. Choose any of the five models under **ML disease classification**.
 3. Select **Run selected ML model** to see its top-three PlantVillage predictions.
-4. Open **Model lab** to compare the locked-test metrics and engineering trade-offs.
+4. Download the formatted Word screening report or open **Model lab** to compare metrics.
 
 The first prediction with a model downloads its ONNX archive from the
 [PlantVillage v1 GitHub Release](https://github.com/divya-aicodes/Vita-Ai/releases/tag/plantvillage-v1).
@@ -173,7 +173,8 @@ vita-ai/
 │   ├── knowledge.py                    Knowledge-base validation
 │   ├── screening.py                    Transparent ranking and abstention
 │   ├── storage.py                      SQLite case metadata and feedback
-│   ├── report.py                       Downloadable report generation
+│   ├── docx_report.py                  Editable Word report generation
+│   ├── report.py                       Legacy plain-text report helper
 │   ├── ml/                              Training, secure model delivery, and ONNX inference
 │   └── data/conditions.json            Curated crop-condition rules
 ├── scripts/prepare_plantvillage.py       Reproducible grouped dataset preparation
