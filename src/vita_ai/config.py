@@ -8,6 +8,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_DIR = PROJECT_ROOT / "runtime"
 DATABASE_PATH = RUNTIME_DIR / "vita_ai.db"
 ML_ARTIFACTS_DIR = PROJECT_ROOT / "artifacts" / "ml"
+ML_MODEL_CACHE_DIR = RUNTIME_DIR / "models"
+ML_RELEASE_MANIFEST_PATH = PROJECT_ROOT / "src" / "vita_ai" / "data" / "model_manifest.json"
+ML_LEADERBOARD_PATH = PROJECT_ROOT / "src" / "vita_ai" / "data" / "model_leaderboard.json"
 
 APP_NAME = "Vita AI"
 APP_VERSION = "0.1.0"

@@ -3,9 +3,12 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .venv/
+.venv-ml/
 runtime/*.db
 runtime/*.db-*
+runtime/models/
 .streamlit/secrets.toml
 artifacts/ml/
-data/
+artifacts/releases/
+/data/
 

@@ -18,11 +18,18 @@ from vita_ai.config import (  # noqa: E402
     APP_VERSION,
     DISTRIBUTIONS,
     ENVIRONMENTS,
-    ML_ARTIFACTS_DIR,
+    ML_LEADERBOARD_PATH,
+    ML_MODEL_CACHE_DIR,
+    ML_RELEASE_MANIFEST_PATH,
     SYMPTOMS,
 )
 from vita_ai.image_quality import ImageValidationError, assess_photo, decode_image  # noqa: E402
 from vita_ai.knowledge import crops, load_conditions  # noqa: E402
+from vita_ai.ml.inference import (  # noqa: E402
+    ModelUnavailableError,
+    available_models,
+    predict,
+)
 from vita_ai.ml.registry import MODEL_SPECS  # noqa: E402
 from vita_ai.ml.results import load_leaderboard  # noqa: E402
 from vita_ai.report import build_report  # noqa: E402
@@ -160,6 +167,64 @@ def photo_panel(uploaded_file):
     return image, assessment
 
 
+def render_ml_prediction(image) -> None:
+    try:
+        trained_keys = available_models(ML_MODEL_CACHE_DIR, ML_RELEASE_MANIFEST_PATH)
+    except (ModelUnavailableError, OSError, json.JSONDecodeError) as exc:
+        st.warning(f"ML models are temporarily unavailable: {exc}")
+        return
+    if not trained_keys:
+        return
+    specifications = {item.key: item for item in MODEL_SPECS}
+    st.subheader("ML disease classification")
+    st.caption(
+        "Select any independently trained model. Predictions cover the 38 controlled "
+        "PlantVillage classes and do not establish field-photo accuracy. The selected model "
+        "is integrity-checked and cached on first use."
+    )
+    selected_key = st.selectbox(
+        "Classification model",
+        trained_keys,
+        format_func=lambda key: specifications[key].display_name,
+    )
+    st.caption(specifications[selected_key].purpose)
+    if st.button("Run selected ML model", type="primary", use_container_width=True):
+        try:
+            with st.spinner("Loading and running the selected model…"):
+                predictions = predict(
+                    image,
+                    artifacts_dir=ML_MODEL_CACHE_DIR,
+                    model_key=selected_key,
+                    manifest_path=ML_RELEASE_MANIFEST_PATH,
+                )
+        except (ModelUnavailableError, OSError, ValueError, json.JSONDecodeError) as exc:
+            st.error(f"The selected model could not run: {exc}")
+            return
+        primary = predictions[0]
+        if primary.confidence >= 0.65:
+            st.success(
+                f"{primary.crop} · {primary.condition} · {primary.confidence:.1%} confidence"
+            )
+        else:
+            st.warning(
+                f"Low-confidence result: {primary.crop} · {primary.condition} · "
+                f"{primary.confidence:.1%}. Treat this as uncertain."
+            )
+        st.dataframe(
+            [
+                {
+                    "Rank": index,
+                    "Crop": item.crop,
+                    "Condition": item.condition,
+                    "Model confidence": f"{item.confidence:.2%}",
+                }
+                for index, item in enumerate(predictions, start=1)
+            ],
+            hide_index=True,
+            use_container_width=True,
+        )
+
+
 def render_result(result, case_id: str, payload: dict) -> None:
     if result.status == "screened":
         st.success(result.headline)
@@ -226,7 +291,9 @@ def render_screening() -> None:
         type=["jpg", "jpeg", "png", "webp"],
         help="Maximum 8 MB. The image is processed in memory and is not stored.",
     )
-    _, photo = photo_panel(uploaded_file)
+    image, photo = photo_panel(uploaded_file)
+    if image is not None:
+        render_ml_prediction(image)
 
     symptom_by_label = {label: key for key, label in SYMPTOMS.items()}
     environment_by_label = {label: key for key, label in ENVIRONMENTS.items()}
@@ -363,7 +430,7 @@ def render_model_lab() -> None:
         use_container_width=True,
     )
 
-    leaderboard_path = ML_ARTIFACTS_DIR / "leaderboard.json"
+    leaderboard_path = ML_LEADERBOARD_PATH
     try:
         leaderboard = load_leaderboard(leaderboard_path)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -388,7 +455,7 @@ def render_model_lab() -> None:
                 "Accuracy": f"{item['accuracy']:.2%}",
                 "Macro F1": f"{item['macro_f1']:.2%}",
                 "Balanced accuracy": f"{item['balanced_accuracy']:.2%}",
-                "Latency": f"{item['inference_ms_per_image']:.1f} ms/image",
+                "Training GPU latency": f"{item['inference_ms_per_image']:.1f} ms/image",
                 "Size": f"{item['model_size_mb']:.1f} MB",
             }
         )
@@ -414,10 +481,9 @@ def render_about() -> None:
     )
     st.subheader("What it deliberately does not claim")
     st.write(
-        "The repository includes a five-model training and comparison pipeline, but does not "
-        "claim a trained classifier is validated until real artifacts and held-out results are "
-        "present. Rule-match percentages remain transparent evidence scores, not probabilities. "
-        "The app never recommends pesticide products or doses."
+        "The five classifiers have controlled PlantVillage test results, not demonstrated "
+        "field-photo accuracy. Rule-match percentages remain transparent evidence scores, not "
+        "probabilities. The app never recommends pesticide products or doses."
     )
     st.subheader("Production path")
     st.markdown(

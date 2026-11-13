@@ -4,9 +4,9 @@ Vita AI is a from-scratch Python prototype for transparent plant-health screenin
 private photo-quality check with a symptom-led decision-support engine, shows the evidence behind
 its shortlist, and explicitly abstains when the case is unclear.
 
-It also includes a reproducible five-model transfer-learning and evaluation pipeline. Trained
-weights and performance numbers are deliberately not committed: they must be produced from a
-documented dataset and untouched test split. A rule-match percentage remains an interpretable
+It also includes five working PlantVillage transfer-learning classifiers. The Streamlit app can
+download any selected, versioned ONNX model from GitHub Releases, verify its checksum, cache it,
+and return the top three of 38 classes. A rule-match percentage remains a separate interpretable
 evidence score, not a model probability or a diagnosis.
 
 ## What the prototype includes
@@ -23,6 +23,7 @@ evidence score, not a model probability or a diagnosis.
 - Unit tests for screening, photo handling, the knowledge base, and persistence
 - GitHub Actions quality, test, and compilation pipeline
 - Comparable EfficientNetV2B0, ConvNeXtTiny, DenseNet121, MobileNetV3Large, and ResNet50V2 trainers
+- User-selectable ONNX inference for all five trained models in the Streamlit screening workflow
 - Test-set accuracy, balanced accuracy, macro/weighted F1, precision, recall, MCC, log loss,
   confusion matrix, model size, and inference-time reporting
 - No image storage and no account requirement
@@ -63,10 +64,23 @@ Install the optional ML dependencies:
 .\.venv\Scripts\python.exe -m pip install -r requirements-ml.txt
 ```
 
-Prepare one fixed dataset split. Every split must contain the same class directories:
+Download the PlantVillage source files (`data.zip`, `splits/`, and `leaf_grouping/`) from the
+[Hugging Face dataset](https://huggingface.co/datasets/mohanty/PlantVillage) into
+`data/plantvillage-source`, then prepare the authors' color split
+(54,305 images, 38 classes):
+
+```powershell
+.\.venv\Scripts\python.exe scripts\prepare_plantvillage.py `
+  --source-dir data\plantvillage-source `
+  --output-dir data\plantvillage
+```
+
+The script keeps the published 10,709-image test set locked and selects validation leaf groups
+only from the published training split. The resulting split is 36,958 train, 6,638 validation,
+and 10,709 test images. Every split contains the same class directories:
 
 ```text
-data/plant-disease/
+data/plantvillage/
 ├── train/<class name>/*.{jpg,jpeg,png,webp}
 ├── val/<class name>/*.{jpg,jpeg,png,webp}
 └── test/<class name>/*.{jpg,jpeg,png,webp}
@@ -79,15 +93,37 @@ Train all five approved models:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\train_models.py `
-  --data-dir data\plant-disease `
-  --epochs 12 `
-  --fine-tune-epochs 8
+  --data-dir data\plantvillage `
+  --epochs 4 `
+  --fine-tune-epochs 6
 ```
 
 Generated weights, labels, per-class reports, confusion matrices, and `leaderboard.json` are written
 under `artifacts/ml/`, which is intentionally ignored by Git. The winner is selected first by test
-macro F1, then balanced accuracy, then inference time. The Streamlit **Model lab** page displays the
-leaderboard when these artifacts are present.
+macro F1, then balanced accuracy, then inference time. `scripts/package_models.py` creates the
+release archives, checksums, deployment manifest, and committed Model lab leaderboard.
+
+Each model performs the same 38-class classification task, with a different engineering role:
+
+- **ConvNeXtTiny:** strongest accuracy candidate
+- **EfficientNetV2B0:** balanced size, speed, and accuracy
+- **DenseNet121:** feature-reuse and fine-texture comparison
+- **MobileNetV3Large:** smallest and fastest deployment candidate
+- **ResNet50V2:** stable residual-network benchmark
+
+Locked PlantVillage test results (10,709 images):
+
+| Model | Accuracy | Macro F1 | GPU latency | ONNX size |
+|---|---:|---:|---:|---:|
+| ResNet50V2 | 99.40% | 99.28% | 8.53 ms/image | 179.9 MB |
+| ConvNeXtTiny | 99.38% | 99.28% | 2.59 ms/image | 106.3 MB |
+| EfficientNetV2B0 | 96.67% | 95.58% | 0.74 ms/image | 22.6 MB |
+| MobileNetV3Large | 94.39% | 92.78% | 0.60 ms/image | 16.2 MB |
+| DenseNet121 | 87.52% | 83.72% | 2.12 ms/image | 27.1 MB |
+
+ResNet50V2 ranks first by unrounded macro F1; MobileNetV3Large is the smallest and fastest.
+Latency was measured on the training machine's RTX 4060 Laptop GPU and is not a Streamlit CPU
+latency guarantee.
 
 The dataset determines the supported classes. A PlantVillage result is a controlled-dataset result;
 it must not be described as field-photo accuracy without a separate representative field test set.
@@ -105,9 +141,11 @@ vita-ai/
 │   ├── screening.py                    Transparent ranking and abstention
 │   ├── storage.py                      SQLite case metadata and feedback
 │   ├── report.py                       Downloadable report generation
-│   ├── ml/                              Model registry, builders, and result reader
+│   ├── ml/                              Training, secure model delivery, and ONNX inference
 │   └── data/conditions.json            Curated crop-condition rules
-├── scripts/train_models.py              Five-model training and locked-test evaluation
+├── scripts/prepare_plantvillage.py       Reproducible grouped dataset preparation
+├── scripts/train_models.py               Five-model training and locked-test evaluation
+├── scripts/package_models.py             Verified GitHub Release packaging
 ├── tests/                              Automated tests
 ├── requirements.txt
 ├── requirements-ml.txt

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 class ModelSpec:
     key: str
     display_name: str
-    application_name: str
+    timm_name: str
     image_size: int
     purpose: str
 
@@ -18,35 +18,35 @@ MODEL_SPECS: tuple[ModelSpec, ...] = (
     ModelSpec(
         key="efficientnet_v2_b0",
         display_name="EfficientNetV2B0",
-        application_name="EfficientNetV2B0",
-        image_size=224,
-        purpose="Best overall accuracy, size, and speed balance",
+        timm_name="tf_efficientnetv2_b0.in1k",
+        image_size=192,
+        purpose="Balanced accuracy, size, and speed candidate",
     ),
     ModelSpec(
         key="convnext_tiny",
         display_name="ConvNeXtTiny",
-        application_name="ConvNeXtTiny",
+        timm_name="convnext_tiny.in12k_ft_in1k",
         image_size=224,
-        purpose="High-accuracy modern CNN candidate",
+        purpose="Strongest controlled-test accuracy candidate",
     ),
     ModelSpec(
         key="densenet121",
         display_name="DenseNet121",
-        application_name="DenseNet121",
+        timm_name="densenet121.ra_in1k",
         image_size=224,
         purpose="Strong fine-texture feature reuse",
     ),
     ModelSpec(
         key="mobilenet_v3_large",
         display_name="MobileNetV3Large",
-        application_name="MobileNetV3Large",
+        timm_name="mobilenetv3_large_100.ra_in1k",
         image_size=224,
         purpose="Efficient mobile and CPU deployment",
     ),
     ModelSpec(
         key="resnet50_v2",
         display_name="ResNet50V2",
-        application_name="ResNet50V2",
+        timm_name="resnetv2_50x1_bit.goog_in21k_ft_in1k",
         image_size=224,
         purpose="Stable residual-network benchmark",
     ),

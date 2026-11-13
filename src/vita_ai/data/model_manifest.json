@@ -1,0 +1,35 @@
+{
+  "release_tag": "plantvillage-v1",
+  "models": {
+    "efficientnet_v2_b0": {
+      "display_name": "EfficientNetV2B0",
+      "url": "https://github.com/divya-aicodes/Vita-Ai/releases/download/plantvillage-v1/efficientnet_v2_b0.zip",
+      "sha256": "8e95653b6a18f4c1ce9d13c74f61fac4225d4877b10313d345834055cc253d80",
+      "size_bytes": 21862475
+    },
+    "convnext_tiny": {
+      "display_name": "ConvNeXtTiny",
+      "url": "https://github.com/divya-aicodes/Vita-Ai/releases/download/plantvillage-v1/convnext_tiny.zip",
+      "sha256": "8e7a75a394b3dc6b774c16167098cd0b62a88ef44045a3a97580138c12e2c13b",
+      "size_bytes": 103612189
+    },
+    "densenet121": {
+      "display_name": "DenseNet121",
+      "url": "https://github.com/divya-aicodes/Vita-Ai/releases/download/plantvillage-v1/densenet121.zip",
+      "sha256": "6a92e04430b308cf5c350ab5fbac72aa69ee0d310f9a8107805cce96d0b03f1b",
+      "size_bytes": 26185368
+    },
+    "mobilenet_v3_large": {
+      "display_name": "MobileNetV3Large",
+      "url": "https://github.com/divya-aicodes/Vita-Ai/releases/download/plantvillage-v1/mobilenet_v3_large.zip",
+      "sha256": "e6155ace7f1a63957da1a70da9b11b754323cc65021d02191f7edb4583c1c1a4",
+      "size_bytes": 15771217
+    },
+    "resnet50_v2": {
+      "display_name": "ResNet50V2",
+      "url": "https://github.com/divya-aicodes/Vita-Ai/releases/download/plantvillage-v1/resnet50_v2.zip",
+      "sha256": "239e868ac5891b3ff05229be5b6d020111a42edeb751ec8f483fb185a8c860ac",
+      "size_bytes": 174660527
+    }
+  }
+}
