@@ -215,3 +215,5 @@ A production disease classifier should be added only after the following evidenc
 Until then, this prototype is appropriate for interface testing, workflow validation, knowledge-base
 review, and gathering structured feedback—not autonomous agricultural diagnosis.
 
+QR Code scan and Examine the Leaf 
+<img width="1920" height="2194" alt="Vita AI QR" src="https://github.com/user-attachments/assets/9c0fb837-b48c-4a86-9bf4-31105ec70101" />
